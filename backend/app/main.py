@@ -7,6 +7,7 @@ from fastapi.middleware.trustedhost import TrustedHostMiddleware
 
 from app.core.app_logging import setup_logging
 from app.core.errors import AppError, app_error_handler
+from app.core.middleware import RateLimitMiddleware, SecurityHeadersMiddleware
 from app.routers import auth
 from app.modules.payslip.router import router as payslip_router
 from app.modules.bills.router import router as bills_router
@@ -24,6 +25,8 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
 app = FastAPI(title="SANGAD API", version="0.1.0", lifespan=lifespan)
 
 app.add_middleware(TrustedHostMiddleware, allowed_hosts=["*"])
+app.add_middleware(RateLimitMiddleware, max_requests=100, window_seconds=60)
+app.add_middleware(SecurityHeadersMiddleware)
 app.add_exception_handler(AppError, app_error_handler)
 
 app.include_router(auth.router)
@@ -46,4 +49,4 @@ async def readyz() -> dict[str, Any]:
 
 @app.get("/api/v1/version")
 async def version() -> dict[str, Any]:
-    return {"version": "0.1.0", "build": "T-101"}
+    return {"version": "0.1.0", "build": "T-701"}

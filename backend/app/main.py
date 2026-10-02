@@ -8,6 +8,11 @@ from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from app.core.app_logging import setup_logging
 from app.core.errors import AppError, app_error_handler
 from app.routers import auth
+from app.modules.payslip.router import router as payslip_router
+from app.modules.bills.router import router as bills_router
+from app.modules.inventory.router import router as inventory_router
+from app.modules.employees.router import router as employees_router
+from app.modules.company.router import router as company_router
 
 
 @asynccontextmanager
@@ -22,6 +27,11 @@ app.add_middleware(TrustedHostMiddleware, allowed_hosts=["*"])
 app.add_exception_handler(AppError, app_error_handler)
 
 app.include_router(auth.router)
+app.include_router(payslip_router)
+app.include_router(bills_router)
+app.include_router(inventory_router)
+app.include_router(employees_router)
+app.include_router(company_router)
 
 
 @app.get("/healthz")
@@ -36,4 +46,4 @@ async def readyz() -> dict[str, Any]:
 
 @app.get("/api/v1/version")
 async def version() -> dict[str, Any]:
-    return {"version": "0.1.0", "build": "T-003"}
+    return {"version": "0.1.0", "build": "T-101"}

@@ -1,0 +1,67 @@
+version: "3.8"
+
+services:
+  api:
+    build:
+      context: ./backend
+    ports:
+      - "127.0.0.1:8000:8000"
+    environment:
+      - SANGAD_DATABASE_URL=${SANGAD_DATABASE_URL:-postgresql://sangad:sangad@postgres:5432/sangad}
+      - SANGAD_REDIS_URL=${SANGAD_REDIS_URL:-redis://redis:6379/0}
+      - SANGAD_SECRET=${SANGAD_SECRET:-insecure-change-me}
+      - SANGAD_DEBUG=${SANGAD_DEBUG:-false}
+      - SANGAD_SMTP_HOST=${SANGAD_SMTP_HOST}
+      - SANGAD_SMTP_PORT=${SANGAD_SMTP_PORT:-587}
+      - SANGAD_SMTP_USER=${SANGAD_SMTP_USER}
+      - SANGAD_SMTP_PASSWORD=${SANGAD_SMTP_PASSWORD}
+      - SANGAD_APP_ENV=local
+      - SANGAD_COOKIE_SECURE=false
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  worker:
+    build:
+      context: ./backend
+    command: ["rq", "worker", "--url", "redis://redis:6379/0", "sangad-jobs"]
+    environment:
+      - SANGAD_DATABASE_URL=${SANGAD_DATABASE_URL:-postgresql://sangad:sangad@postgres:5432/sangad}
+      - SANGAD_REDIS_URL=${SANGAD_REDIS_URL:-redis://redis:6379/0}
+      - SANGAD_SECRET=${SANGAD_SECRET:-insecure-change-me}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: sangad
+      POSTGRES_USER: sangad
+      POSTGRES_PASSWORD: sangad
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sangad"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+volumes:
+  pgdata:

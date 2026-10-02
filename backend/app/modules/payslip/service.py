@@ -1,23 +1,28 @@
-from datetime import date, datetime, timezone
+from datetime import date
 from decimal import Decimal
 from typing import Optional
 
 from sqlalchemy.orm import Session as DbSession
 
-from app.kernel.models import Payslip, PayslipLine, PayslipDelivery
-from app.modules.payslip.calculations import calculate_payslip, amount_to_words_inr
+from app.kernel.integration import EmployeeDirectoryAdapter, CompanyProfileAdapter
+from app.kernel.models import Payslip, PayslipLine, PayslipDelivery, AuditLog
+from app.modules.payslip.calculations import calculate_payslip
 from app.modules.payslip.schemas import PayslipCreate
 
 
 class PayslipService:
     def __init__(self, db: DbSession):
         self.db = db
+        self.employees = EmployeeDirectoryAdapter(db)
+        self.company = CompanyProfileAdapter(db)
 
     def create_payslip(self, data: PayslipCreate) -> dict:
         calc = calculate_payslip(data.basic, data.other_allowances, [Decimal(str(d["amount"])) for d in data.deduction_lines])
+        emp_data = self.employees.get_employee(data.employee_code)
+        comp_data = self.company.get_letterhead()
         snapshot = {
-            "employee": {"name": data.employee_name, "designation": data.designation, "date_of_joining": str(data.date_of_joining) if data.date_of_joining else None, "aadhaar": data.aadhaar},
-            "company": {},
+            "employee": {"name": data.employee_name or (emp_data["name"] if emp_data else ""), "designation": data.designation or (emp_data["designation"] if emp_data else ""), "date_of_joining": str(data.date_of_joining) if data.date_of_joining else (emp_data.get("date_of_joining") if emp_data else None), "aadhaar": data.aadhaar},
+            "company": comp_data,
         }
         payslip = Payslip(
             employee_code=data.employee_code,
@@ -35,13 +40,10 @@ class PayslipService:
         self.db.add(payslip)
         self.db.flush()
         for d in data.deduction_lines:
-            line = PayslipLine(payslip_id=payslip.id, kind="deduction", label=d["label"], amount=Decimal(str(d["amount"])))
-            self.db.add(line)
-        earning_line = PayslipLine(payslip_id=payslip.id, kind="earning", label="Basic", amount=data.basic)
-        self.db.add(earning_line)
+            self.db.add(PayslipLine(payslip_id=payslip.id, kind="deduction", label=d["label"], amount=Decimal(str(d["amount"]))))
+        self.db.add(PayslipLine(payslip_id=payslip.id, kind="earning", label="Basic", amount=data.basic))
         if data.other_allowances:
-            allow_line = PayslipLine(payslip_id=payslip.id, kind="earning", label="Other Allowances", amount=data.other_allowances)
-            self.db.add(allow_line)
+            self.db.add(PayslipLine(payslip_id=payslip.id, kind="earning", label="Other Allowances", amount=data.other_allowances))
         self.db.commit()
         return self._to_dict(payslip)
 

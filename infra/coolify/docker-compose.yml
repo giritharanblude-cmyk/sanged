@@ -1,15 +1,24 @@
 # SANGAD — Coolify Docker Compose
 # Deployed through Coolify as a Compose application.
-# Do NOT edit or run this file directly on the host.
+#
+# Local/dev deviations from docs/SANGAD_ARCHITECTURE_v0_3.md, both deliberate:
+#   * ADR-16 puts Postgres/Redis in Coolify database resources. Here they are
+#     compose services so a clean checkout comes up self-contained. Move them to
+#     Coolify resources (and point DATABASE_URL/REDIS_URL at them) for production
+#     so Coolify's scheduled backups cover them.
+#   * The `migrate` service was dropped: there is no alembic.ini or migrations/
+#     directory in the repo yet, so `alembic upgrade head` cannot succeed. It
+#     comes back with T-003 (Alembic).
+#   * The `openwa` service was dropped: image `openwa.dev/openwa:0.23.5` does not
+#     exist on any registry. It is a Phase 2 task (T-212).
 
 services:
   api:
     build:
-      context: ./backend
-      dockerfile: Dockerfile
-    domain: sangad.localhost
-    ports:
-      - "127.0.0.1:8000:8000"
+      context: ../..
+      dockerfile: backend/Dockerfile
+    domains:
+      - sangad.localhost
     environment:
       - APP_ENV=${APP_ENV}
       - DATABASE_URL=${DATABASE_URL}
@@ -36,19 +45,16 @@ services:
       - LLM_API_KEY=${LLM_API_KEY}
       - LLM_API_URL=${LLM_API_URL}
     depends_on:
-      migrate:
-        condition: service_completed_successfully
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/readyz"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     restart: unless-stopped
 
   worker:
     build:
-      context: ./backend
-      dockerfile: Dockerfile
+      context: ../..
+      dockerfile: backend/Dockerfile
     command: ["rq", "worker", "--url", "${REDIS_URL}", "sangad-jobs"]
     environment:
       - APP_ENV=${APP_ENV}
@@ -73,31 +79,36 @@ services:
       - LLM_API_KEY=${LLM_API_KEY}
       - LLM_API_URL=${LLM_API_URL}
     depends_on:
-      migrate:
-        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     restart: unless-stopped
 
-  migrate:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
-    command: ["alembic", "upgrade", "head"]
+  postgres:
+    image: postgres:16.10-alpine
     environment:
-      - DATABASE_URL=${DATABASE_URL}
-      - APP_ENV=${APP_ENV}
-    restart: no
-
-  openwa:
-    image: openwa.dev/openwa:0.23.5
-    environment:
-      - ENGINE_TYPE=baileys
-      - API_KEY=${OPENWA_API_KEY}
-      - WEBHOOK_URL=http://api:8001/internal/v1/channels/whatsapp/webhook
-      - WEBHOOK_EVENTS=message.received,session.status
-      - WEBHOOK_SECRET=${OPENWA_WEBHOOK_SECRET}
+      - POSTGRES_DB=${POSTGRES_DB}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
     volumes:
-      - openwa_data:/app/data
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    restart: unless-stopped
+
+  redis:
+    image: redis:7.4-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
     restart: unless-stopped
 
 volumes:
-  openwa_data:
+  postgres_data:

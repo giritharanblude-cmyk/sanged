@@ -1,12 +1,17 @@
 from contextlib import asynccontextmanager
 from collections.abc import AsyncIterator
+from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 from app.core.config import settings
 from app.core.logging import setup_logging
 from app.core.db import engine
+
+# Built SPA assets, copied in by backend/Dockerfile (ADR-17: one origin).
+STATIC_DIR = Path(__file__).resolve().parent.parent / "static"
 
 
 @asynccontextmanager
@@ -39,3 +44,8 @@ async def healthz():
 @app.get("/readyz")
 async def readyz():
     return {"status": "ok"}
+
+
+# Mounted last so it never shadows the health routes or future /api/v1 routes.
+if STATIC_DIR.is_dir():
+    app.mount("/", StaticFiles(directory=STATIC_DIR, html=True), name="spa")

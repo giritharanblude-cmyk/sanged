@@ -90,6 +90,10 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+    # The image HEALTHCHECK probes an HTTP endpoint, which a queue worker never
+    # serves, so it fails with connection-refused even while the worker is fine.
+    healthcheck:
+      disable: true
     restart: unless-stopped
 
   postgres:

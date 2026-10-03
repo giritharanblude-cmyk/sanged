@@ -1,5 +1,8 @@
-from pydantic_settings import BaseSettings
-from typing import List
+import json
+
+from pydantic import field_validator
+from pydantic_settings import BaseSettings, NoDecode
+from typing import Annotated, Any, List
 
 
 class Settings(BaseSettings):
@@ -8,7 +11,10 @@ class Settings(BaseSettings):
     database_url: str = "postgresql+psycopg2://sangad:sangad@localhost:5432/sangad"
     redis_url: str = "redis://localhost:6379/0"
     secret_key: str = "change-me-in-production"
-    allowed_hosts: List[str] = ["sangad.localhost"]
+    # NoDecode: env vars arrive as raw strings. Without it pydantic-settings
+    # JSON-decodes complex fields, so a plain ALLOWED_HOSTS=sangad.localhost
+    # raises SettingsError instead of parsing.
+    allowed_hosts: Annotated[List[str], NoDecode] = ["sangad.localhost"]
     cookie_secure: bool = False
     smtp_host: str = ""
     smtp_port: int = 587
@@ -30,6 +36,19 @@ class Settings(BaseSettings):
     llm_api_url: str = ""
 
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
+
+    @field_validator("allowed_hosts", mode="before")
+    @classmethod
+    def _parse_allowed_hosts(cls, value: Any) -> Any:
+        """Accept a JSON list, a comma-separated list, or a single host."""
+        if not isinstance(value, str):
+            return value
+        raw = value.strip()
+        if not raw:
+            return []
+        if raw.startswith("["):
+            return json.loads(raw)
+        return [host.strip() for host in raw.split(",") if host.strip()]
 
 
 settings = Settings()

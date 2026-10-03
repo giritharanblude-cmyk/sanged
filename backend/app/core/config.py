@@ -5,7 +5,7 @@ from typing import List
 class Settings(BaseSettings):
     app_env: str = "local"
     debug: bool = False
-    database_url: str = "postgresql://sangad:sangad@localhost:5432/sangad"
+    database_url: str = "postgresql+psycopg2://sangad:sangad@localhost:5432/sangad"
     redis_url: str = "redis://localhost:6379/0"
     secret_key: str = "change-me-in-production"
     allowed_hosts: List[str] = ["sangad.localhost"]

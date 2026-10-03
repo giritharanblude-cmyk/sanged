@@ -11,14 +11,21 @@
 #     comes back with T-003 (Alembic).
 #   * The `openwa` service was dropped: image `openwa.dev/openwa:0.23.5` does not
 #     exist on any registry. It is a Phase 2 task (T-212).
+#
+# Two things Coolify imposes on this file:
+#   * No `domains:` key. `domains` is a Coolify extension, not Compose schema, so
+#     the `docker compose build` that Coolify runs against this very file fails
+#     with `services.api additional properties 'domains' not allowed`. Routing is
+#     configured in Coolify instead (app > Domains, api -> http://sangad.localhost).
+#   * `build.context` is `.`, not `../..`. Coolify invokes compose with
+#     `--project-directory <repo root>`, and Compose resolves `context` against
+#     the project directory, so `../..` would point at the filesystem root.
 
 services:
   api:
     build:
-      context: ../..
+      context: .
       dockerfile: backend/Dockerfile
-    domains:
-      - sangad.localhost
     environment:
       - APP_ENV=${APP_ENV}
       - DATABASE_URL=${DATABASE_URL}
@@ -53,7 +60,7 @@ services:
 
   worker:
     build:
-      context: ../..
+      context: .
       dockerfile: backend/Dockerfile
     command: ["rq", "worker", "--url", "${REDIS_URL}", "sangad-jobs"]
     environment:

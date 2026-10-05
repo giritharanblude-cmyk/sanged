@@ -48,6 +48,10 @@ COPY backend/requirements.txt ./requirements.txt
 RUN pip install -r requirements.txt
 
 COPY backend/app ./app
+# Alembic needs its config and migration scripts in the image so the API can
+# apply migrations on start.
+COPY backend/alembic.ini ./alembic.ini
+COPY backend/migrations ./migrations
 COPY --from=frontend /build/dist ./static
 
 # Drop privileges for the runtime process.

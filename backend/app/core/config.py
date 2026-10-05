@@ -21,6 +21,9 @@ class Settings(BaseSettings):
     smtp_user: str = ""
     smtp_password: str = ""
     smtp_from: str = ""
+    # Local SMTP sinks (Mailpit) speak plain SMTP on 1025 with no auth, so
+    # STARTTLS and LOGIN must be opt-in rather than unconditional.
+    smtp_starttls: bool = True
     s3_endpoint_url: str = ""
     s3_access_key: str = ""
     s3_secret_key: str = ""
@@ -34,8 +37,21 @@ class Settings(BaseSettings):
     extraction_provider: str = "llm"
     llm_api_key: str = ""
     llm_api_url: str = ""
+    # Auth policy (ported from the phase-3 branch).
+    otp_expiry_minutes: int = 5
+    otp_max_attempts: int = 5
+    session_idle_minutes: int = 30
+    session_absolute_hours: int = 12
+    # Bootstrap admin, used only by `python -m app.seed`.
+    admin_username: str = "admin"
+    admin_email: str = "admin@sangad.localhost"
+    admin_password: str = ""
 
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
+
+    @property
+    def is_local(self) -> bool:
+        return self.app_env == "local"
 
     @field_validator("allowed_hosts", mode="before")
     @classmethod

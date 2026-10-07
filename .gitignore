@@ -22,6 +22,7 @@ frontend/src/**/*.js
 # Environment
 .env
 .env.local
+.env.test
 
 # IDE
 .vscode/
@@ -29,6 +30,7 @@ frontend/src/**/*.js
 *.swp
 *.swo
 *~
+*�
 
 # OS
 .DS_Store
@@ -44,3 +46,8 @@ docker-compose.override.yml
 coverage/
 htmlcov/
 .coverage
+
+# Python caches
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/

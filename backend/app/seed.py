@@ -11,7 +11,7 @@ import sys
 
 from app.core.config import settings
 from app.core.db import SessionLocal
-from app.core.security import hash_password
+from app.core.passwords import hash_password
 from app.kernel.models import User
 
 logger = logging.getLogger(__name__)

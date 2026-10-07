@@ -1,3 +1,4 @@
+"""RFC 9457-style problem responses for all API errors (docs T-003)."""
 from fastapi import Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
@@ -13,6 +14,8 @@ class ProblemDetail(BaseModel):
 
 
 class AppError(Exception):
+    """Domain error carrying an HTTP problem response (status/code/detail)."""
+
     def __init__(self, status: int, code: str, detail: str) -> None:
         self.status = status
         self.code = code
@@ -36,4 +39,5 @@ def problem_response(
 
 
 async def app_error_handler(request: Request, exc: AppError) -> JSONResponse:
+    """Exception handler signature per Starlette; returns the problem JSON."""
     return problem_response(exc.status, exc.code, exc.detail, str(request.url))

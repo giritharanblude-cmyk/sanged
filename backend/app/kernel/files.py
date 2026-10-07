@@ -1,3 +1,4 @@
+"""File record service: content-addressed dedupe by sha256 (kernel F/T-005)."""
 import hashlib
 
 from sqlalchemy.orm import Session as DbSession
@@ -7,7 +8,7 @@ from app.kernel.models import File
 
 def store_file_record(
     db: DbSession, data: bytes, mime: str, storage_key: str, uploaded_by: str | None = None
-) -> dict:
+) -> dict[str, object]:
     sha256 = hashlib.sha256(data).hexdigest()
     existing = db.query(File).filter(File.sha256 == sha256).first()
     if existing:

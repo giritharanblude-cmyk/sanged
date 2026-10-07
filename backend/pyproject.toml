@@ -1,0 +1,43 @@
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+# Alembic revision scripts are generated code, never app code: editing them by
+# hand is the migration path, so style rules would only create noise there.
+exclude = ["migrations"]
+
+[tool.ruff.lint]
+select = [
+    "E", "F", "W",      # pycodestyle / pyflakes
+    "I",                # isort
+    "N",                # pep8-naming
+    "UP",               # pyupgrade
+    "B",                # bugbear
+    "S",                # bandit
+    "A",                # builtins shadowing
+    "C4",               # comprehensions
+    "SIM",              # simplify
+    "T20",              # no print in app code
+    "RUF",              # ruff-specific
+    "PL",               # pylint-derived high-value checks
+    "DTZ",              # naive datetimes (always use UTC explicit)
+    "RET",              # return simplifications
+    "ARG",              # unused function arguments
+]
+
+[tool.ruff.lint.per-file-ignores]
+# Tests need asserts (S101) and test fixtures with fake secrets (S105/S106).
+"tests/**" = ["S101", "S105", "S106"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+exclude = ["migrations/"]
+warn_unused_ignores = true
+warn_redundant_casts = true
+no_implicit_reexport = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+asyncio_mode = "auto"
+addopts = "-q"

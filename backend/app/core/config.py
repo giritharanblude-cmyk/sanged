@@ -1,8 +1,8 @@
 import json
+from typing import Annotated, Any
 
 from pydantic import field_validator
 from pydantic_settings import BaseSettings, NoDecode
-from typing import Annotated, Any, List
 
 
 class Settings(BaseSettings):
@@ -10,11 +10,11 @@ class Settings(BaseSettings):
     debug: bool = False
     database_url: str = "postgresql+psycopg2://sangad:sangad@localhost:5432/sangad"
     redis_url: str = "redis://localhost:6379/0"
-    secret_key: str = "change-me-in-production"
+    secret_key: str = "change-me-in-production"  # noqa: S105 - placeholder, set SECRET_KEY
     # NoDecode: env vars arrive as raw strings. Without it pydantic-settings
     # JSON-decodes complex fields, so a plain ALLOWED_HOSTS=sangad.localhost
     # raises SettingsError instead of parsing.
-    allowed_hosts: Annotated[List[str], NoDecode] = ["sangad.localhost"]
+    allowed_hosts: Annotated[list[str], NoDecode] = ["sangad.localhost"]
     cookie_secure: bool = False
     smtp_host: str = ""
     smtp_port: int = 587
@@ -48,6 +48,10 @@ class Settings(BaseSettings):
     admin_password: str = ""
 
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
+
+    def session_lifetime_seconds(self) -> int:
+        """Absolute session cap in seconds (single source of truth for cookies)."""
+        return self.session_absolute_hours * 3600
 
     @property
     def is_local(self) -> bool:

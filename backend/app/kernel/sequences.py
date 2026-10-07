@@ -4,12 +4,16 @@ from sqlalchemy.orm import Session as DbSession
 
 from app.kernel.models import NumberSequence
 
+FY_START_MONTH = 4  # April, per C-04 (financial year Apr-Mar)
+
 
 def next_serial(db: DbSession, series: str, fy: str | None = None) -> str:
     now = datetime.now(UTC)
     year = now.year
     fy = fy or (
-        f"{year % 100}{(year + 1) % 100}" if now.month >= 4 else f"{(year - 1) % 100}{year % 100}"
+        f"{year % 100}{(year + 1) % 100}"
+        if now.month >= FY_START_MONTH
+        else f"{(year - 1) % 100}{year % 100}"
     )
     seq = (
         db.query(NumberSequence)

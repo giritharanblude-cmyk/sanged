@@ -1,3 +1,4 @@
+import os
 import sys
 from pathlib import Path
 
@@ -14,10 +15,9 @@ from app.kernel.models import Base  # noqa: E402
 config = context.config
 target_metadata = Base.metadata
 
-# Prefer DATABASE_URL over the placeholder baked into alembic.ini, otherwise
-# migrations inside the container would target localhost instead of postgres.
-if settings.database_url:
-    config.set_main_option("sqlalchemy.url", settings.database_url)
+# The URL is supplied only through validated runtime settings, never ini.
+migration_url = os.environ.get("MIGRATION_DATABASE_URL", settings.database_url)
+config.set_main_option("sqlalchemy.url", migration_url.replace("%", "%%"))
 
 
 def run_migrations_offline() -> None:

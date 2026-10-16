@@ -3,6 +3,7 @@ __pycache__/
 *.py[cod]
 *.egg-info/
 .venv/
+/backend/.venv-phase0a/
 venv/
 *.egg
 dist/
@@ -46,6 +47,11 @@ docker-compose.override.yml
 coverage/
 htmlcov/
 .coverage
+frontend/playwright-report/
+frontend/test-results/
+
+# Local phase evidence is retained on this machine unless explicitly approved.
+docs/phase-0a-evidence/
 
 # Python caches
 .mypy_cache/

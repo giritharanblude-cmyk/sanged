@@ -3,7 +3,7 @@ import { api, ApiError } from '../api'
 
 interface Props {
   username: string
-  onVerified: (username: string) => void
+  onVerified: (user: { username: string; role: string }) => void
 }
 
 export function OtpView({ username, onVerified }: Props) {
@@ -17,7 +17,7 @@ export function OtpView({ username, onVerified }: Props) {
     setError('')
     try {
       const res = await api.verifyOtp(username, otp)
-      onVerified(res.user.username)
+      onVerified(res.user)
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Verification failed')
     } finally {
@@ -42,6 +42,7 @@ export function OtpView({ username, onVerified }: Props) {
           value={otp}
           onChange={(e) => setOtp(e.target.value)}
           inputMode="numeric"
+          pattern="[0-9]{6}"
           maxLength={6}
           required
           autoFocus

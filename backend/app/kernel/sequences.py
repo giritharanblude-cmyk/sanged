@@ -1,5 +1,6 @@
 from datetime import UTC, datetime
 
+from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session as DbSession
 
 from app.kernel.models import NumberSequence
@@ -15,15 +16,15 @@ def next_serial(db: DbSession, series: str, fy: str | None = None) -> str:
         if now.month >= FY_START_MONTH
         else f"{(year - 1) % 100}{year % 100}"
     )
-    seq = (
-        db.query(NumberSequence)
-        .filter(NumberSequence.series == series, NumberSequence.fy == fy)
-        .with_for_update()
-        .first()
+    statement = (
+        insert(NumberSequence)
+        .values(series=series, fy=fy, last_value=1)
+        .on_conflict_do_update(
+            index_elements=[NumberSequence.series, NumberSequence.fy],
+            set_={"last_value": NumberSequence.last_value + 1},
+        )
+        .returning(NumberSequence.last_value)
     )
-    if not seq:
-        seq = NumberSequence(series=series, fy=fy, last_value=0)
-        db.add(seq)
-    seq.last_value += 1
+    last_value = db.execute(statement).scalar_one()
     db.commit()
-    return f"{series}-{fy}-{seq.last_value:06d}"
+    return f"{series}-{fy}-{last_value:06d}"

@@ -2,9 +2,9 @@
 from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import Any, cast
+from typing import Annotated, Any, cast
 
-from fastapi import FastAPI, Request, Response
+from fastapi import Depends, FastAPI, Request, Response
 from fastapi import status as fastapi_status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
@@ -21,8 +21,10 @@ from app.core.middleware import (
     RateLimitMiddleware,
     SecurityHeadersMiddleware,
 )
-from app.core.security import CsrfError
+from app.core.security import CsrfError, require_user
+from app.kernel.files import probe_storage
 from app.kernel.jobs import get_redis
+from app.kernel.models import User
 from app.modules.bills.router import router as bills_router
 from app.modules.company.router import router as company_router
 from app.modules.employees.router import router as employees_router
@@ -102,7 +104,7 @@ def healthz() -> dict[str, str]:
 
 @app.get("/readyz")
 def readyz(response: Response) -> dict[str, Any]:
-    """Readiness: DB and Redis really answer (V-PLAT-02, V-LOC-01).
+    """Readiness: database, Redis and configured file storage answer.
 
     Any dependency failure returns 503 so the deploy is not declared healthy.
     """
@@ -128,13 +130,20 @@ def readyz(response: Response) -> dict[str, Any]:
         checks["redis"] = f"error: {type(exc).__name__}"
         status = 503
 
+    try:
+        probe_storage()
+        checks["storage"] = "ok"
+    except Exception as exc:  # readiness reports the failure class
+        checks["storage"] = f"error: {type(exc).__name__}"
+        status = 503
+
     response.status_code = status
     state = "ok" if status == fastapi_status.HTTP_200_OK else "degraded"
     return {"status": state, "checks": checks}
 
 
 @app.get("/api/v1/version")
-def version() -> dict[str, str]:
+def version(_user: Annotated[User, Depends(require_user)]) -> dict[str, str]:
     return {"version": "0.1.0"}
 
 

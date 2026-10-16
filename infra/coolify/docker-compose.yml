@@ -32,10 +32,13 @@ services:
     command:
       - sh
       - -c
-      - alembic upgrade head && python -m app.seed && exec uvicorn app.main:app --host 0.0.0.0 --port 8000
+      - alembic upgrade head && unset MIGRATION_DATABASE_URL && python -m app.seed && exec uvicorn app.main:app --host 0.0.0.0 --port 8000
     environment:
       - APP_ENV=${APP_ENV}
+      - DEBUG=${DEBUG:-false}
       - DATABASE_URL=${DATABASE_URL}
+      - MIGRATION_DATABASE_URL=${MIGRATION_DATABASE_URL}
+      - APP_DB_USER=${APP_DB_USER}
       - REDIS_URL=${REDIS_URL}
       - SECRET_KEY=${SECRET_KEY}
       - ALLOWED_HOSTS=${ALLOWED_HOSTS}
@@ -45,6 +48,7 @@ services:
       - SMTP_USER=${SMTP_USER}
       - SMTP_PASSWORD=${SMTP_PASSWORD}
       - SMTP_FROM=${SMTP_FROM}
+      - SMTP_STARTTLS=${SMTP_STARTTLS:-true}
       - SMTP_STARTTLS=${SMTP_STARTTLS}
       - ADMIN_USERNAME=${ADMIN_USERNAME}
       - ADMIN_EMAIL=${ADMIN_EMAIL}
@@ -54,7 +58,9 @@ services:
       - S3_SECRET_KEY=${S3_SECRET_KEY}
       - S3_BUCKET_FILES=${S3_BUCKET_FILES}
       - S3_BUCKET_BACKUPS=${S3_BUCKET_BACKUPS}
-      - S3_FORCE_PATH_STYLE=true
+      - S3_FORCE_PATH_STYLE=${S3_FORCE_PATH_STYLE}
+      - STORAGE_BACKEND=${STORAGE_BACKEND}
+      - STORAGE_PATH=${STORAGE_PATH}
       - ENCRYPTION_KEY=${ENCRYPTION_KEY}
       - OPENWA_API_URL=${OPENWA_API_URL}
       - OPENWA_API_KEY=${OPENWA_API_KEY}
@@ -62,6 +68,10 @@ services:
       - EXTRACTION_PROVIDER=${EXTRACTION_PROVIDER}
       - LLM_API_KEY=${LLM_API_KEY}
       - LLM_API_URL=${LLM_API_URL}
+      - OTP_EXPIRY_MINUTES=${OTP_EXPIRY_MINUTES:-5}
+      - OTP_MAX_ATTEMPTS=${OTP_MAX_ATTEMPTS:-5}
+      - SESSION_IDLE_MINUTES=${SESSION_IDLE_MINUTES:-30}
+      - SESSION_ABSOLUTE_HOURS=${SESSION_ABSOLUTE_HOURS:-12}
     depends_on:
       postgres:
         condition: service_healthy
@@ -93,18 +103,25 @@ services:
       - SMTP_USER=${SMTP_USER}
       - SMTP_PASSWORD=${SMTP_PASSWORD}
       - SMTP_FROM=${SMTP_FROM}
+      - SMTP_STARTTLS=${SMTP_STARTTLS:-true}
       - S3_ENDPOINT_URL=${S3_ENDPOINT_URL}
       - S3_ACCESS_KEY=${S3_ACCESS_KEY}
       - S3_SECRET_KEY=${S3_SECRET_KEY}
       - S3_BUCKET_FILES=${S3_BUCKET_FILES}
       - S3_BUCKET_BACKUPS=${S3_BUCKET_BACKUPS}
-      - S3_FORCE_PATH_STYLE=true
+      - S3_FORCE_PATH_STYLE=${S3_FORCE_PATH_STYLE}
+      - STORAGE_BACKEND=${STORAGE_BACKEND}
+      - STORAGE_PATH=${STORAGE_PATH}
       - ENCRYPTION_KEY=${ENCRYPTION_KEY}
       - OPENWA_API_URL=${OPENWA_API_URL}
       - OPENWA_API_KEY=${OPENWA_API_KEY}
       - EXTRACTION_PROVIDER=${EXTRACTION_PROVIDER}
       - LLM_API_KEY=${LLM_API_KEY}
       - LLM_API_URL=${LLM_API_URL}
+      - OTP_EXPIRY_MINUTES=${OTP_EXPIRY_MINUTES:-5}
+      - OTP_MAX_ATTEMPTS=${OTP_MAX_ATTEMPTS:-5}
+      - SESSION_IDLE_MINUTES=${SESSION_IDLE_MINUTES:-30}
+      - SESSION_ABSOLUTE_HOURS=${SESSION_ABSOLUTE_HOURS:-12}
     depends_on:
       postgres:
         condition: service_healthy

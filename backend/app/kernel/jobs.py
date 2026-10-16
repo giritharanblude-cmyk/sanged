@@ -12,6 +12,7 @@ from collections.abc import Callable
 from typing import Any, cast
 
 from redis import Redis
+from rq.exceptions import NoSuchJobError
 from rq.job import Job
 from rq.queue import Queue
 
@@ -65,7 +66,8 @@ def get_queue() -> Queue:
     """The sangad-jobs queue; same queue name the worker boots with."""
     global _queue  # noqa: PLW0603 - deliberate lazy singleton (see comment above)
     if _queue is None:
-        _queue = Queue("sangad-jobs", connection=get_redis())
+        queue_connection = Redis.from_url(settings.redis_url)
+        _queue = Queue("sangad-jobs", connection=queue_connection)
     return _queue
 
 
@@ -81,6 +83,6 @@ def enqueue(func: Callable[..., Any], *args: Any, **kwargs: Any) -> Job:
 
 def get_job(job_id: str) -> Job | None:
     try:
-        return Job.fetch(job_id, connection=get_redis())
-    except Exception:  # missing ids are an expected lookup miss
+        return Job.fetch(job_id, connection=get_queue().connection)
+    except NoSuchJobError:
         return None

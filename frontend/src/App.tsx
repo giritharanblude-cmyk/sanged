@@ -13,7 +13,15 @@ const MODULES = [
   { name: 'Company', icon: '🏢', color: 'bg-rose-100 text-rose-700', ready: false },
 ]
 
-function Landing({ username, onLogout }: { username: string; onLogout: () => void }) {
+function Landing({
+  username,
+  role,
+  onLogout,
+}: {
+  username: string
+  role: string
+  onLogout: () => void
+}) {
   const navigate = useNavigate()
 
   return (
@@ -22,7 +30,7 @@ function Landing({ username, onLogout }: { username: string; onLogout: () => voi
         <div className="mx-auto flex max-w-4xl items-center justify-between px-8 py-4">
           <span className="font-semibold text-gray-900">SANGAD</span>
           <div className="flex items-center gap-3">
-            <span className="text-sm text-gray-500">{username}</span>
+            <span className="text-sm text-gray-500">{username} · {role}</span>
             <button
               onClick={async () => {
                 await api.logout().catch(() => undefined)
@@ -66,7 +74,7 @@ type Screen =
   | { name: 'loading' }
   | { name: 'anon' }
   | { name: 'otp'; username: string }
-  | { name: 'auth'; username: string }
+  | { name: 'auth'; username: string; role: string }
 
 export function App() {
   const [screen, setScreen] = useState<Screen>({ name: 'loading' })
@@ -74,7 +82,7 @@ export function App() {
   const refresh = useCallback(async () => {
     try {
       const me = await api.me()
-      setScreen({ name: 'auth', username: me.username })
+      setScreen({ name: 'auth', username: me.username, role: me.role })
     } catch {
       setScreen({ name: 'anon' })
     }
@@ -95,20 +103,35 @@ export function App() {
       ) : screen.name === 'otp' ? (
         <OtpView
           username={screen.username}
-          onVerified={(username) => setScreen({ name: 'auth', username })}
+          onVerified={(user) => setScreen({ name: 'auth', ...user })}
         />
       ) : (
-        <Authed username={screen.username} onLogout={() => setScreen({ name: 'anon' })} />
+        <Authed
+          username={screen.username}
+          role={screen.role}
+          onLogout={() => setScreen({ name: 'anon' })}
+        />
       )}
     </BrowserRouter>
   )
 }
 
-function Authed({ username, onLogout }: { username: string; onLogout: () => void }) {
+function Authed({
+  username,
+  role,
+  onLogout,
+}: {
+  username: string
+  role: string
+  onLogout: () => void
+}) {
   return (
     <Routes>
-      <Route path='/payslips' element={<PayslipView username={username} onLogout={onLogout} />} />
-      <Route path='*' element={<Landing username={username} onLogout={onLogout} />} />
+      <Route
+        path="/payslips"
+        element={<PayslipView username={username} role={role} onLogout={onLogout} />}
+      />
+      <Route path="*" element={<Landing username={username} role={role} onLogout={onLogout} />} />
       <Route path='/index.html' element={<Navigate to="/" replace />} />
     </Routes>
   )

@@ -12,12 +12,11 @@ from app.kernel.jobs import get_redis, redis_incr
 PUBLIC_PATHS: tuple[str, ...] = (
     "/healthz",
     "/readyz",
-    "/api/v1/auth/login",
-    "/api/v1/auth/verify-otp",
-    "/api/v1/version",
 )
 # Paths where browser-side mutations happen without an authenticated user.
-CSRF_EXEMPT_PREFIXES: tuple[str, ...] = ("/api/v1/auth/",)
+CSRF_EXEMPT_PATHS: frozenset[str] = frozenset(
+    {"/api/v1/auth/login", "/api/v1/auth/verify-otp"}
+)
 
 # Handlers must never exceed their window counting cost; keys expire anyway.
 RATE_KEY: str = "sangad:ratelimit:{bucket}:{window}"
@@ -46,7 +45,7 @@ class CsrfMiddleware(BaseHTTPMiddleware):
 
     async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
         path = request.url.path
-        if request.method in CSRF_SAFE_METHODS or path.startswith(CSRF_EXEMPT_PREFIXES):
+        if request.method in CSRF_SAFE_METHODS or path in CSRF_EXEMPT_PATHS:
             return await call_next(request)
         try:
             assert_csrf(request)
@@ -59,7 +58,7 @@ class CsrfMiddleware(BaseHTTPMiddleware):
 
 
 class RateLimitMiddleware(BaseHTTPMiddleware):
-    """Sliding-window counter per client IP, kept in Redis so it survives
+    """Fixed-window counter per client IP, kept in Redis so it survives
     restarts and is shared across workers (T-701: the old version used a
     per-process dict that leaked memory and reset on every deploy)."""
 

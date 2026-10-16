@@ -124,7 +124,7 @@ def change_password_init(
     user: Annotated[models.User, Depends(require_user)],
     db: Annotated[DbSession, Depends(get_db)],
 ) -> dict[str, str]:
-    """F-AUTH-03 step 1 (V-AUTH-03): re-verify the password, then email an OTP."""
+    """F-AUTH-03 step 1 (V-AUTH-03): email an OTP to the authenticated user."""
     return request_password_change_otp(db, user, _client_ip(request))
 
 

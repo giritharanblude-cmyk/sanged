@@ -4,10 +4,11 @@ import { CreatePayslip } from './CreatePayslip'
 
 interface Props {
   username: string
+  role: string
   onLogout: () => void
 }
 
-export function PayslipView({ username, onLogout }: Props) {
+export function PayslipView({ username, role, onLogout }: Props) {
   const [rows, setRows] = useState<Payslip[] | null>(null)
   const [error, setError] = useState('')
   const [showForm, setShowForm] = useState(false)
@@ -37,7 +38,7 @@ export function PayslipView({ username, onLogout }: Props) {
             <span className="font-semibold text-gray-900">Payslips</span>
           </div>
           <div className="flex items-center gap-3">
-            <span className="text-sm text-gray-500">{username}</span>
+            <span className="text-sm text-gray-500">{username} · {role}</span>
             <button
               onClick={async () => {
                 await api.logout().catch(() => undefined)

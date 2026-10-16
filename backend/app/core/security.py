@@ -51,9 +51,10 @@ def require_user(
 def assert_csrf(request: Request) -> None:
     """Double-submit CSRF check for unsafe methods (T-701 OWASP review).
 
-    The cookie is issued alongside the session at login; JS clients echo it in
-    the x-csrf-token header. A cross-site attacker can make the browser send
-    the cookie but cannot read it (httpOnly) so cannot set the header.
+    The token cookie is readable to same-origin JavaScript, which echoes it in
+    the x-csrf-token header. SameSite=Strict and the browser's same-origin
+    policy prevent a cross-site page from reading it and sending a matching
+    header; the session cookie itself remains HTTP-only.
     """
     if request.method in CSRF_SAFE_METHODS:
         return

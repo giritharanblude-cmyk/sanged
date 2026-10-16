@@ -1,21 +1,34 @@
+import ipaddress
 import json
-from typing import Annotated, Any
+import os
+from typing import Annotated, Any, Literal
 
-from pydantic import field_validator
+from dotenv import dotenv_values
+from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings, NoDecode
+
+
+def _is_loopback_host(host: str) -> bool:
+    normalized = host.strip().strip("[]").lower()
+    if normalized == "localhost" or normalized.endswith(".localhost"):
+        return True
+    try:
+        return ipaddress.ip_address(normalized).is_loopback
+    except ValueError:
+        return False
 
 
 class Settings(BaseSettings):
     app_env: str = "local"
     debug: bool = False
-    database_url: str = "postgresql+psycopg2://sangad:sangad@localhost:5432/sangad"
+    database_url: str
     redis_url: str = "redis://localhost:6379/0"
-    secret_key: str = "change-me-in-production"  # noqa: S105 - placeholder, set SECRET_KEY
+    secret_key: str
     # NoDecode: env vars arrive as raw strings. Without it pydantic-settings
     # JSON-decodes complex fields, so a plain ALLOWED_HOSTS=sangad.localhost
     # raises SettingsError instead of parsing.
     allowed_hosts: Annotated[list[str], NoDecode] = ["sangad.localhost"]
-    cookie_secure: bool = False
+    cookie_secure: bool = True
     smtp_host: str = ""
     smtp_port: int = 587
     smtp_user: str = ""
@@ -30,6 +43,8 @@ class Settings(BaseSettings):
     s3_bucket_files: str = "sangad-files"
     s3_bucket_backups: str = "sangad-backups"
     s3_force_path_style: bool = True
+    storage_backend: Literal["s3", "filesystem"] = "s3"
+    storage_path: str = "/var/lib/sangad/storage"
     encryption_key: str = ""
     openwa_api_url: str = ""
     openwa_api_key: str = ""
@@ -47,7 +62,11 @@ class Settings(BaseSettings):
     admin_email: str = "admin@sangad.localhost"
     admin_password: str = ""
 
-    model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
+    model_config = {
+        "env_file": ".env",
+        "env_file_encoding": "utf-8",
+        "extra": "ignore",
+    }
 
     def session_lifetime_seconds(self) -> int:
         """Absolute session cap in seconds (single source of truth for cookies)."""
@@ -70,5 +89,31 @@ class Settings(BaseSettings):
             return json.loads(raw)
         return [host.strip() for host in raw.split(",") if host.strip()]
 
+    @model_validator(mode="after")
+    def validate_transport_settings(self) -> "Settings":
+        """Keep insecure cookies limited to a local-only host configuration."""
+        if "cookie_secure" not in self.model_fields_set:
+            self.cookie_secure = not self.is_local
+        if self.cookie_secure:
+            return self
+        if not self.is_local:
+            raise ValueError("COOKIE_SECURE=false is only permitted with APP_ENV=local")
+        if any(not _is_loopback_host(host) for host in self.allowed_hosts):
+            raise ValueError("COOKIE_SECURE=false requires loopback-only ALLOWED_HOSTS")
+        return self
 
-settings = Settings()
+
+_dotenv_values = dotenv_values(".env")
+
+
+def _required_setting(name: str) -> str:
+    value = os.environ.get(name, _dotenv_values.get(name))
+    if value is None or not value.strip():
+        raise ValueError(f"{name} is required")
+    return value
+
+
+settings = Settings(
+    database_url=_required_setting("DATABASE_URL"),
+    secret_key=_required_setting("SECRET_KEY"),
+)

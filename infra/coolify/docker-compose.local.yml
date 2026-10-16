@@ -1,0 +1,5 @@
+# Local-only override for plain Docker testing; Coolify does not consume this file.
+services:
+  api:
+    ports:
+      - "127.0.0.1:8088:8000"

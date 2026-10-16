@@ -9,10 +9,9 @@ FROM node:20.19-alpine AS frontend
 
 WORKDIR /build
 
-# Install dependencies from the lockfile-free manifest first so this layer is
-# cached until package.json actually changes.
-COPY frontend/package.json ./
-RUN npm install --no-audit --no-fund
+# Install exactly the frontend dependency tree committed in the lockfile.
+COPY frontend/package.json frontend/package-lock.json ./
+RUN npm ci --no-audit --no-fund
 
 COPY frontend/ ./
 RUN npm run build
@@ -26,6 +25,9 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1
+
+# Keep the image's package installer on the approved security-fixed release.
+RUN python -m pip install --no-cache-dir --upgrade "pip==26.2.1"
 
 # WeasyPrint (PDF generation, ADR-03) links against system Pango/HarfBuzz/fontconfig
 # rather than bundling it, so these are hard runtime requirements, not build extras.
@@ -47,6 +49,7 @@ WORKDIR /app
 COPY backend/requirements.txt ./requirements.txt
 RUN pip install -r requirements.txt
 
+COPY backend/pyproject.toml ./pyproject.toml
 COPY backend/app ./app
 # Alembic needs its config and migration scripts in the image so the API can
 # apply migrations on start.
@@ -56,7 +59,8 @@ COPY --from=frontend /build/dist ./static
 
 # Drop privileges for the runtime process.
 RUN useradd --create-home --uid 10001 sangad \
-    && chown -R sangad:sangad /app
+    && mkdir -p /var/lib/sangad/storage \
+    && chown -R sangad:sangad /app /var/lib/sangad
 USER sangad
 
 EXPOSE 8000

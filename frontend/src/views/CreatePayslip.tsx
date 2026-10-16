@@ -105,7 +105,7 @@ export function CreatePayslip({ onCreated }: Props) {
             <label className="mb-1 block text-sm text-gray-700" htmlFor="dp">
               Days paid
             </label>
-            <input id="dp" required type="number" min="0" value={daysPaid} onChange={(e) => setDaysPaid(e.target.value)} className={FIELD} />
+            <input id="dp" required type="number" min="0" max={workingDays} value={daysPaid} onChange={(e) => setDaysPaid(e.target.value)} className={FIELD} />
           </div>
         </div>
       </div>

@@ -1,0 +1,80 @@
+{% raw %}
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  @page { size: A4; margin: 20mm; }
+  body { font-family: 'Noto Sans', sans-serif; font-size: 11pt; color: #333; }
+  .header { text-align: center; border-bottom: 2px solid #1a5276; padding-bottom: 10px; margin-bottom: 20px; }
+  .header h2 { margin: 0; color: #1a5276; }
+  .header p { margin: 2px 0; font-size: 10pt; color: #555; }
+  .payslip-title { text-align: center; font-size: 16pt; font-weight: bold; color: #1a5276; margin: 20px 0; }
+  table { width: 100%; border-collapse: collapse; margin: 10px 0; }
+  th, td { padding: 6px 8px; text-align: left; border: 1px solid #ccc; }
+  th { background: #f0f0f0; font-weight: 600; }
+  .amount { text-align: right; }
+  .total-row td { font-weight: bold; background: #e8f0f8; }
+  .net-pay { font-size: 13pt; font-weight: bold; color: #1a5276; text-align: center; margin: 15px 0; }
+  .net-words { text-align: center; font-size: 10pt; font-style: italic; margin: 10px 0; }
+  .footer { margin-top: 30px; font-size: 10pt; }
+  .signatory { margin-top: 40px; }
+</style>
+</head>
+<body>
+  <div class="header">
+    <h2>{{ company.legal_name }}</h2>
+    <p>{{ company.address }}</p>
+    <p>Phone: {{ company.phone }} | Email: {{ company.email }}</p>
+    {% if company.website %}<p>{{ company.website }}</p>{% endif %}
+  </div>
+
+  <div class="payslip-title">PAYSLIP</div>
+
+  <table>
+    <tr><td style="width:50%"><strong>Employee Name:</strong> {{ employee.name }}</td><td><strong>Employee ID:</strong> {{ employee.employee_code }}</td></tr>
+    <tr><td><strong>Designation:</strong> {{ employee.designation }}</td><td><strong>Date of Joining:</strong> {{ employee.date_of_joining }}</td></tr>
+    <tr><td><strong>Aadhaar No.:</strong> {{ employee.aadhaar }}</td><td><strong>Bank Payment Mode:</strong> {{ employee.payment_mode }}</td></tr>
+    <tr><td><strong>Pay Period:</strong> {{ payslip.month }}</td><td><strong>Date of Issue:</strong> {{ payslip.issued_on }}</td></tr>
+    <tr><td><strong>Total Working Days:</strong> {{ payslip.total_working_days }}</td><td><strong>Days Paid:</strong> {{ payslip.days_paid }}</td></tr>
+  </table>
+
+  <table>
+    <thead><tr><th>Earnings</th><th class="amount">Amount (₹)</th></tr></thead>
+    <tbody>
+      {% for line in earnings %}
+      <tr><td>{{ line.label }}</td><td class="amount">{{ "{:,.2f}".format(line.amount) }}</td></tr>
+      {% endfor %}
+      <tr class="total-row"><td>Gross Earnings</td><td class="amount">{{ "{:,.2f}".format(payslip.gross) }}</td></tr>
+    </tbody>
+  </table>
+
+  {% if deductions %}
+  <table>
+    <thead><tr><th>Deductions</th><th class="amount">Amount (₹)</th></tr></thead>
+    <tbody>
+      {% for line in deductions %}
+      <tr><td>{{ line.label }}</td><td class="amount">{{ "{:,.2f}".format(line.amount) }}</td></tr>
+      {% endfor %}
+      <tr class="total-row"><td>Total Deductions</td><td class="amount">{{ "{:,.2f}".format(payslip.total_deductions) }}</td></tr>
+    </tbody>
+  </table>
+  {% endif %}
+
+  <div class="net-pay">Net Pay: ₹ {{ "{:,.2f}".format(payslip.net) }}</div>
+  <div class="net-words">Rupees {{ payslip.net_in_words }} Only</div>
+
+  {% if not company.pf_applicable %}
+  <p style="font-size:9pt; color:#888;"><em>PF is not applicable for this establishment.</em></p>
+  {% endif %}
+
+  <div class="footer">
+    <p>This is a computer-generated payslip.</p>
+    <div class="signatory">
+      <p>Authorised Signatory</p>
+      <p><strong>{{ company.signatory }}</strong></p>
+    </div>
+  </div>
+</body>
+</html>
+{% endraw %}

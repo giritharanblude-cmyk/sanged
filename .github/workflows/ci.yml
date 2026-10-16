@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main, develop]
+    branches: [main, "release/**"]
   pull_request:
     branches: [main]
 
@@ -21,36 +21,9 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
-      - run: pip install ruff mypy
-      - run: ruff check app/
-      - run: mypy app/ --ignore-missing-imports
-
-  backend-test:
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: ./backend
-    services:
-      postgres:
-        image: postgres:16
-        env:
-          POSTGRES_DB: sangad_test
-          POSTGRES_USER: sangad
-          POSTGRES_PASSWORD: sangad
-        ports:
-          - 5432:5432
-      redis:
-        image: redis:7
-        ports:
-          - 6379:6379
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
       - run: pip install -r requirements.txt
-      - run: pip install pytest pytest-asyncio httpx
-      - run: pytest tests/ -v --cov=app --cov-fail-under=80
+      - run: ruff check app tests
+      - run: mypy app tests
 
   frontend-lint:
     runs-on: ubuntu-latest
@@ -63,8 +36,8 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
       - run: npm ci
-      - run: npx eslint src/
-      - run: npx tsc --noEmit
+      - run: npm run lint
+      - run: npm run typecheck
 
   frontend-test:
     runs-on: ubuntu-latest
@@ -77,7 +50,8 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
       - run: npm ci
-      - run: npx vitest --coverage --coverage.threshold=80
+      - run: npm run test -- --coverage
+      - run: npm run build
 
   dependency-audit:
     runs-on: ubuntu-latest
@@ -94,3 +68,61 @@ jobs:
       - run: npm audit --audit-level=high
         working-directory: ./frontend
         continue-on-error: true
+
+  dev-stack:
+    runs-on: ubuntu-latest
+    env:
+      APP_ENV: local
+      POSTGRES_DB: sangad
+      POSTGRES_USER: sangad
+      APP_DB_USER: sangad_app
+      ALLOWED_HOSTS: localhost,sangad.localhost,127.0.0.1
+      COOKIE_SECURE: "false"
+      REDIS_URL: redis://redis:6379/0
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      - name: Generate isolated CI credentials
+        run: |
+          POSTGRES_PASSWORD="$(python -c 'import secrets; print(secrets.token_urlsafe(24))')"
+          APP_DB_PASSWORD="$(python -c 'import secrets; print(secrets.token_urlsafe(24))')"
+          S3_ACCESS_KEY="$(python -c 'import secrets; print(secrets.token_hex(16))')"
+          S3_SECRET_KEY="$(python -c 'import secrets; print(secrets.token_urlsafe(32))')"
+          SECRET_KEY="$(python -c 'import secrets; print(secrets.token_urlsafe(48))')"
+          ADMIN_PASSWORD="$(python -c 'import secrets; print(secrets.token_urlsafe(24))')"
+          ENCRYPTION_KEY="$(python -c 'import base64, secrets; print(base64.urlsafe_b64encode(secrets.token_bytes(32)).decode())')"
+          {
+            echo "POSTGRES_PASSWORD=$POSTGRES_PASSWORD"
+            echo "APP_DB_PASSWORD=$APP_DB_PASSWORD"
+            echo "S3_ACCESS_KEY=$S3_ACCESS_KEY"
+            echo "S3_SECRET_KEY=$S3_SECRET_KEY"
+            echo "SECRET_KEY=$SECRET_KEY"
+            echo "ADMIN_PASSWORD=$ADMIN_PASSWORD"
+            echo "ENCRYPTION_KEY=$ENCRYPTION_KEY"
+            echo "DATABASE_URL=postgresql+psycopg2://sangad:$POSTGRES_PASSWORD@postgres:5432/sangad"
+          } >> "$GITHUB_ENV"
+      - run: cp .env.example .env
+      - run: npm ci
+        working-directory: ./frontend
+      - run: npx playwright install --with-deps chromium
+        working-directory: ./frontend
+      - run: docker compose -f docker-compose.dev.yml up --build -d --wait --wait-timeout 300
+      - run: |
+          curl --fail http://127.0.0.1:5173/ >/dev/null
+          docker compose -f docker-compose.dev.yml exec -T api python -c "import urllib.request; print(urllib.request.urlopen('http://127.0.0.1:8000/readyz').read().decode())"
+          curl --fail -H 'Host: sangad.localhost' http://127.0.0.1:8088/openapi.json | diff -u frontend/openapi.json -
+      - run: PLAYWRIGHT_ADMIN_PASSWORD="$ADMIN_PASSWORD" npm run test:e2e
+        working-directory: ./frontend
+        env:
+          PLAYWRIGHT_BASE_URL: http://sangad.localhost:5173
+          PLAYWRIGHT_MAILPIT_URL: http://127.0.0.1:8025
+      - run: docker compose -f docker-compose.dev.yml exec -T api sh -c 'DATABASE_URL="$TEST_DATABASE_URL" REDIS_URL="$TEST_REDIS_URL" pytest --cov=app --cov-fail-under=80'
+      - run: |
+          docker compose -f docker-compose.dev.yml exec -T api sh -c 'MIGRATION_DATABASE_URL="$MIGRATION_TEST_DATABASE_URL" alembic upgrade head && MIGRATION_DATABASE_URL="$MIGRATION_TEST_DATABASE_URL" alembic downgrade base && MIGRATION_DATABASE_URL="$MIGRATION_TEST_DATABASE_URL" alembic upgrade head'
+      - if: always()
+        run: docker compose -f docker-compose.dev.yml down -v

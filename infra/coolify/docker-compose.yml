@@ -1,18 +1,44 @@
 # SANGAD — Coolify Docker Compose
 # Deployed through Coolify as a Compose application.
-# Do NOT edit or run this file directly on the host.
+#
+# Local/dev deviations from docs/SANGAD_ARCHITECTURE_v0_3.md, both deliberate:
+#   * ADR-16 puts Postgres/Redis in Coolify database resources. Here they are
+#     compose services so a clean checkout comes up self-contained. Move them to
+#     Coolify resources (and point DATABASE_URL/REDIS_URL at them) for production
+#     so Coolify's scheduled backups cover them.
+#   * The `migrate` service is not a separate service: the api container runs
+#     `alembic upgrade head` and the admin seed itself before serving. A
+#     dedicated service would mean a third build of the same 933 MB image, which
+#     the host disk cannot comfortably absorb.
+#   * The `openwa` service was dropped: image `openwa.dev/openwa:0.23.5` does not
+#     exist on any registry. It is a Phase 2 task (T-212).
+#
+# Two things Coolify imposes on this file:
+#   * No `domains:` key. `domains` is a Coolify extension, not Compose schema, so
+#     the `docker compose build` that Coolify runs against this very file fails
+#     with `services.api additional properties 'domains' not allowed`. Routing is
+#     configured in Coolify instead (app > Domains, api -> http://sangad.localhost).
+#   * `build.context` is `.`, not `../..`. Coolify invokes compose with
+#     `--project-directory <repo root>`, and Compose resolves `context` against
+#     the project directory, so `../..` would point at the filesystem root.
 
 services:
   api:
     build:
-      context: ./backend
-      dockerfile: Dockerfile
-    domain: sangad.localhost
-    ports:
-      - "127.0.0.1:8000:8000"
+      context: .
+      dockerfile: backend/Dockerfile
+    # Migrations and the admin seed run here so no extra `migrate` service (and
+    # no third copy of the image) is needed. Both steps are idempotent.
+    command:
+      - sh
+      - -c
+      - alembic upgrade head && unset MIGRATION_DATABASE_URL && python -m app.seed && exec uvicorn app.main:app --host 0.0.0.0 --port 8000
     environment:
       - APP_ENV=${APP_ENV}
+      - DEBUG=${DEBUG:-false}
       - DATABASE_URL=${DATABASE_URL}
+      - MIGRATION_DATABASE_URL=${MIGRATION_DATABASE_URL}
+      - APP_DB_USER=${APP_DB_USER}
       - REDIS_URL=${REDIS_URL}
       - SECRET_KEY=${SECRET_KEY}
       - ALLOWED_HOSTS=${ALLOWED_HOSTS}
@@ -22,12 +48,19 @@ services:
       - SMTP_USER=${SMTP_USER}
       - SMTP_PASSWORD=${SMTP_PASSWORD}
       - SMTP_FROM=${SMTP_FROM}
+      - SMTP_STARTTLS=${SMTP_STARTTLS:-true}
+      - SMTP_STARTTLS=${SMTP_STARTTLS}
+      - ADMIN_USERNAME=${ADMIN_USERNAME}
+      - ADMIN_EMAIL=${ADMIN_EMAIL}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD}
       - S3_ENDPOINT_URL=${S3_ENDPOINT_URL}
       - S3_ACCESS_KEY=${S3_ACCESS_KEY}
       - S3_SECRET_KEY=${S3_SECRET_KEY}
       - S3_BUCKET_FILES=${S3_BUCKET_FILES}
       - S3_BUCKET_BACKUPS=${S3_BUCKET_BACKUPS}
-      - S3_FORCE_PATH_STYLE=true
+      - S3_FORCE_PATH_STYLE=${S3_FORCE_PATH_STYLE}
+      - STORAGE_BACKEND=${STORAGE_BACKEND}
+      - STORAGE_PATH=${STORAGE_PATH}
       - ENCRYPTION_KEY=${ENCRYPTION_KEY}
       - OPENWA_API_URL=${OPENWA_API_URL}
       - OPENWA_API_KEY=${OPENWA_API_KEY}
@@ -35,20 +68,30 @@ services:
       - EXTRACTION_PROVIDER=${EXTRACTION_PROVIDER}
       - LLM_API_KEY=${LLM_API_KEY}
       - LLM_API_URL=${LLM_API_URL}
+      - OTP_EXPIRY_MINUTES=${OTP_EXPIRY_MINUTES:-5}
+      - OTP_MAX_ATTEMPTS=${OTP_MAX_ATTEMPTS:-5}
+      - SESSION_IDLE_MINUTES=${SESSION_IDLE_MINUTES:-30}
+      - SESSION_ABSOLUTE_HOURS=${SESSION_ABSOLUTE_HOURS:-12}
     depends_on:
-      migrate:
-        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      mailpit:
+        condition: service_started
+    # Migrations run before uvicorn, so allow longer than the image default.
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/readyz"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
+      test: ["CMD", "python", "-c", "import urllib.request as u; u.urlopen(u.Request('http://127.0.0.1:8000/healthz', headers={'Host':'sangad.localhost'}), timeout=4)"]
+      interval: 15s
+      timeout: 5s
+      start_period: 90s
+      retries: 5
     restart: unless-stopped
 
   worker:
     build:
-      context: ./backend
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: backend/Dockerfile
     command: ["rq", "worker", "--url", "${REDIS_URL}", "sangad-jobs"]
     environment:
       - APP_ENV=${APP_ENV}
@@ -60,44 +103,71 @@ services:
       - SMTP_USER=${SMTP_USER}
       - SMTP_PASSWORD=${SMTP_PASSWORD}
       - SMTP_FROM=${SMTP_FROM}
+      - SMTP_STARTTLS=${SMTP_STARTTLS:-true}
       - S3_ENDPOINT_URL=${S3_ENDPOINT_URL}
       - S3_ACCESS_KEY=${S3_ACCESS_KEY}
       - S3_SECRET_KEY=${S3_SECRET_KEY}
       - S3_BUCKET_FILES=${S3_BUCKET_FILES}
       - S3_BUCKET_BACKUPS=${S3_BUCKET_BACKUPS}
-      - S3_FORCE_PATH_STYLE=true
+      - S3_FORCE_PATH_STYLE=${S3_FORCE_PATH_STYLE}
+      - STORAGE_BACKEND=${STORAGE_BACKEND}
+      - STORAGE_PATH=${STORAGE_PATH}
       - ENCRYPTION_KEY=${ENCRYPTION_KEY}
       - OPENWA_API_URL=${OPENWA_API_URL}
       - OPENWA_API_KEY=${OPENWA_API_KEY}
       - EXTRACTION_PROVIDER=${EXTRACTION_PROVIDER}
       - LLM_API_KEY=${LLM_API_KEY}
       - LLM_API_URL=${LLM_API_URL}
+      - OTP_EXPIRY_MINUTES=${OTP_EXPIRY_MINUTES:-5}
+      - OTP_MAX_ATTEMPTS=${OTP_MAX_ATTEMPTS:-5}
+      - SESSION_IDLE_MINUTES=${SESSION_IDLE_MINUTES:-30}
+      - SESSION_ABSOLUTE_HOURS=${SESSION_ABSOLUTE_HOURS:-12}
     depends_on:
-      migrate:
-        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    # The image HEALTHCHECK probes an HTTP endpoint, which a queue worker never
+    # serves, so it fails with connection-refused even while the worker is fine.
+    healthcheck:
+      disable: true
     restart: unless-stopped
 
-  migrate:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
-    command: ["alembic", "upgrade", "head"]
+  postgres:
+    image: postgres:16.10-alpine
     environment:
-      - DATABASE_URL=${DATABASE_URL}
-      - APP_ENV=${APP_ENV}
-    restart: no
-
-  openwa:
-    image: openwa.dev/openwa:0.23.5
-    environment:
-      - ENGINE_TYPE=baileys
-      - API_KEY=${OPENWA_API_KEY}
-      - WEBHOOK_URL=http://api:8001/internal/v1/channels/whatsapp/webhook
-      - WEBHOOK_EVENTS=message.received,session.status
-      - WEBHOOK_SECRET=${OPENWA_WEBHOOK_SECRET}
+      - POSTGRES_DB=${POSTGRES_DB}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
     volumes:
-      - openwa_data:/app/data
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    restart: unless-stopped
+
+  redis:
+    image: redis:7.4-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  # Local SMTP sink so the OTP login flow is completable without a real
+  # mailbox. Read the code at http://127.0.0.1:8025. Loopback-only per R-26.
+  mailpit:
+    image: axllent/mailpit:latest
+    environment:
+      - MP_SMTP_AUTH_ACCEPT_ANY=1
+      - MP_SMTP_AUTH_ALLOW_INSECURE=1
+    ports:
+      - "127.0.0.1:8025:8025"
     restart: unless-stopped
 
 volumes:
-  openwa_data:
+  postgres_data:

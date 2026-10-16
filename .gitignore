@@ -3,6 +3,7 @@ __pycache__/
 *.py[cod]
 *.egg-info/
 .venv/
+/backend/.venv-phase0a/
 venv/
 *.egg
 dist/
@@ -14,9 +15,15 @@ dist/
 .next/
 *.tsbuildinfo
 
+# Frontend source is .ts/.tsx only. Vite resolves .js before .ts, so a stray
+# emitted .js would silently shadow its source. tsconfig sets noEmit, this is a
+# safety net for anyone running a bare `tsc`.
+frontend/src/**/*.js
+
 # Environment
 .env
 .env.local
+.env.test
 
 # IDE
 .vscode/
@@ -24,6 +31,7 @@ dist/
 *.swp
 *.swo
 *~
+*�
 
 # OS
 .DS_Store
@@ -39,3 +47,13 @@ docker-compose.override.yml
 coverage/
 htmlcov/
 .coverage
+frontend/playwright-report/
+frontend/test-results/
+
+# Local phase evidence is retained on this machine unless explicitly approved.
+docs/phase-0a-evidence/
+
+# Python caches
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/

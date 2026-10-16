@@ -1,0 +1,156 @@
+services:
+  postgres:
+    image: postgres:16.10-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:?Set POSTGRES_DB in .env}
+      POSTGRES_USER: ${POSTGRES_USER:?Set POSTGRES_USER in .env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+      APP_DB_USER: ${APP_DB_USER:-sangad_app}
+      APP_DB_PASSWORD: ${APP_DB_PASSWORD:?Set APP_DB_PASSWORD in .env}
+    volumes:
+      - postgres_dev_data:/var/lib/postgresql/data
+      - ./backend/create-app-role.sql:/docker-entrypoint-initdb.d/00-app-role.sql:ro
+      - ./backend/init-test-db.sql:/docker-entrypoint-initdb.d/10-test-databases.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  redis:
+    image: redis:7.4-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  seaweedfs:
+    image: chrislusf/seaweedfs:4.48
+    command: ["mini", "-dir=/data"]
+    environment:
+      AWS_ACCESS_KEY_ID: ${S3_ACCESS_KEY:?Set S3_ACCESS_KEY in .env}
+      AWS_SECRET_ACCESS_KEY: ${S3_SECRET_KEY:?Set S3_SECRET_KEY in .env}
+      S3_BUCKET: ${S3_BUCKET_FILES:-sangad-files}
+    volumes:
+      - seaweedfs_dev_data:/data
+    healthcheck:
+      test:
+        - CMD
+        - curl
+        - -fsS
+        - http://127.0.0.1:9333/cluster/status
+      interval: 5s
+      timeout: 3s
+      retries: 30
+      start_period: 20s
+
+  mailpit:
+    image: axllent/mailpit:v1.27.8
+    ports:
+      - "127.0.0.1:8025:8025"
+    healthcheck:
+      test: ["CMD", "/mailpit", "readyz"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  api:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    command:
+      - sh
+      - -c
+      - alembic upgrade head && unset MIGRATION_DATABASE_URL && python -m app.seed && exec uvicorn app.main:app --host 0.0.0.0 --port 8000
+    environment:
+      APP_ENV: ${APP_ENV:-local}
+      DEBUG: ${DEBUG:-false}
+      DATABASE_URL: postgresql+psycopg2://${APP_DB_USER:-sangad_app}:${APP_DB_PASSWORD:?Set APP_DB_PASSWORD in .env}@postgres:5432/${POSTGRES_DB:?Set POSTGRES_DB in .env}
+      MIGRATION_DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      TEST_DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/sangad_test
+      APP_TEST_DATABASE_URL: postgresql+psycopg2://${APP_DB_USER:-sangad_app}:${APP_DB_PASSWORD}@postgres:5432/sangad_test
+      MIGRATION_TEST_DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/sangad_migration_test
+      APP_DB_USER: ${APP_DB_USER:-sangad_app}
+      TEST_REDIS_URL: redis://redis:6379/1
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+      SECRET_KEY: ${SECRET_KEY:?Set SECRET_KEY in .env}
+      ALLOWED_HOSTS: ${ALLOWED_HOSTS:-localhost,sangad.localhost,127.0.0.1}
+      COOKIE_SECURE: ${COOKIE_SECURE:-false}
+      ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@sangad.localhost}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:?Set ADMIN_PASSWORD in .env}
+      SMTP_HOST: ${SMTP_HOST:-mailpit}
+      SMTP_PORT: ${SMTP_PORT:-1025}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_FROM: ${SMTP_FROM:-SANGAD <no-reply@sangad.localhost>}
+      SMTP_STARTTLS: ${SMTP_STARTTLS:-false}
+      STORAGE_BACKEND: ${STORAGE_BACKEND:-s3}
+      STORAGE_PATH: ${STORAGE_PATH:-/var/lib/sangad/storage}
+      S3_ENDPOINT_URL: ${S3_ENDPOINT_URL:-http://seaweedfs:8333}
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY:-}
+      S3_SECRET_KEY: ${S3_SECRET_KEY:-}
+      S3_BUCKET_FILES: ${S3_BUCKET_FILES:-sangad-files}
+      S3_BUCKET_BACKUPS: ${S3_BUCKET_BACKUPS:-sangad-backups}
+      S3_FORCE_PATH_STYLE: ${S3_FORCE_PATH_STYLE:-true}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:-}
+      OTP_EXPIRY_MINUTES: ${OTP_EXPIRY_MINUTES:-5}
+      OTP_MAX_ATTEMPTS: ${OTP_MAX_ATTEMPTS:-5}
+      SESSION_IDLE_MINUTES: ${SESSION_IDLE_MINUTES:-30}
+      SESSION_ABSOLUTE_HOURS: ${SESSION_ABSOLUTE_HOURS:-12}
+    volumes:
+      - app_storage:/var/lib/sangad/storage
+      - ./backend/tests:/app/tests:ro
+    ports:
+      - "127.0.0.1:8088:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      seaweedfs:
+        condition: service_healthy
+      mailpit:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen(urllib.request.Request('http://127.0.0.1:8000/readyz', headers={'Host':'sangad.localhost'}), timeout=4)"
+      interval: 10s
+      timeout: 5s
+      start_period: 90s
+      retries: 12
+
+  frontend:
+    image: node:20.19-alpine
+    working_dir: /app
+    command: ["sh", "-c", "npm ci --no-audit --no-fund && npm run dev -- --host 0.0.0.0"]
+    environment:
+      VITE_API_PROXY_TARGET: http://api:8000
+    volumes:
+      - ./frontend:/app
+      - frontend_node_modules:/app/node_modules
+    ports:
+      - "127.0.0.1:5173:5173"
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:5173').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+      interval: 10s
+      timeout: 5s
+      start_period: 30s
+      retries: 12
+
+volumes:
+  postgres_dev_data:
+  app_storage:
+  frontend_node_modules:
+  seaweedfs_dev_data:

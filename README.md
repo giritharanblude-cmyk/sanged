@@ -65,11 +65,11 @@ the API startup command unsets the migration URL before starting the server.
 
 ```
 sanged/
-├─ docs/                       # Architecture, ADRs, runbooks
+├─ docs/                       # Architecture, build plan
 ├─ backend/
 │  ├─ app/
 │  │  ├─ main.py              # FastAPI entry point
-│  │  ├─ core/                # Config, DB, security, errors, logging
+│  │  ├─ core/                # Config, DB, security, errors, logging, money
 │  │  ├─ kernel/              # Auth, audit, files, mail, jobs, ports
 │  │  └─ modules/             # payslip, bills, inventory, employees, company
 │  ├─ migrations/             # Alembic
@@ -78,12 +78,13 @@ sanged/
 │  └─ src/
 │     ├─ App.tsx              # Auth flow and five-module landing
 │     ├─ api.ts               # Same-origin API client with CSRF token echo
+│     ├─ components/          # Shared KpiCard and DataTable
 │     └─ views/               # Login, OTP, payslip list and form
 └─ infra/
    ├─ coolify/                # Docker Compose, env template
    ├─ local/                  # Host setup notes
-   ├─ runbooks/               # Deploy, restore, WhatsApp pairing
-   └─ scripts/                # deploy.sh, offdisk-backup.sh
+   ├─ runbooks/               # Operations, local host, hardening record
+   └─ scripts/                # deploy, backup, restore, LAN scan
 ```
 
 ## Validation
@@ -101,3 +102,23 @@ Frontend checks run from `frontend/` with `npm ci`, `npm run typecheck`,
 `npm run lint`, `npm run test -- --coverage --run`, and `npm run build`.
 The build regenerates `src/generated/api.ts` from the checked-in OpenAPI
 schema; CI compares that schema with the running backend API.
+
+`npm run test:e2e` drives the real OTP login flow in a browser against
+the running stack, with Mailpit standing in for the mailbox.
+
+## Operating the host
+
+The host runbook, the reboot and power-loss drills, the backup and
+restore drill and the LAN exposure check live in `infra/runbooks/` and
+`infra/scripts/`:
+
+| Document | What it covers |
+|---|---|
+| `infra/runbooks/local-host.md` | Reboot test (5 minute limit), sleep, power loss, UPS, host rebuild |
+| `infra/runbooks/host-hardening-record.md` | Blank record of what was hardened on the host |
+| `infra/runbooks/operations.md` | Deploy, rollback, restore, key escrow, breach response |
+| `infra/scripts/restore.sh` | Restores a dump into a scratch database and compares the row counts |
+| `infra/scripts/lan-portscan.sh` | Fails when any port answers from the LAN |
+
+`infra/scripts/restore.sh` is exercised by the backend test suite, so a
+backup that cannot be restored fails the build rather than the drill.

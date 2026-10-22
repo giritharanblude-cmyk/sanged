@@ -77,6 +77,9 @@ services:
       # The decision-guard test reads the architecture and build plan, which
       # are not part of the image. The docs are mounted read-only below.
       SANGAD_DOCS_ROOT: /docs
+      # The compose-policy test reads the compose files, which are not part
+      # of the image either. Only the files it needs are mounted.
+      SANGAD_REPO_ROOT: /repo
       SECRET_KEY: ${SECRET_KEY:?Set SECRET_KEY in .env}
       ALLOWED_HOSTS: ${ALLOWED_HOSTS:-localhost,sangad.localhost,127.0.0.1}
       COOKIE_SECURE: ${COOKIE_SECURE:-false}
@@ -108,6 +111,8 @@ services:
       - app_storage:/var/lib/sangad/storage
       - ./backend/tests:/app/tests:ro
       - ./docs:/docs:ro
+      - ./infra:/repo/infra:ro
+      - ./docker-compose.dev.yml:/repo/docker-compose.dev.yml:ro
     ports:
       - "127.0.0.1:8088:8000"
     depends_on:

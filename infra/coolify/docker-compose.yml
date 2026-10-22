@@ -71,6 +71,8 @@ services:
       - OTP_MAX_ATTEMPTS=${OTP_MAX_ATTEMPTS:-5}
       - SESSION_IDLE_MINUTES=${SESSION_IDLE_MINUTES:-30}
       - SESSION_ABSOLUTE_HOURS=${SESSION_ABSOLUTE_HOURS:-12}
+      - LOGIN_FAILURE_LIMIT=${LOGIN_FAILURE_LIMIT:-5}
+      - LOGIN_LOCKOUT_MINUTES=${LOGIN_LOCKOUT_MINUTES:-15}
     depends_on:
       postgres:
         condition: service_healthy
@@ -159,11 +161,9 @@ services:
 
   # Local SMTP sink so the OTP login flow is completable without a real
   # mailbox. Read the code at http://127.0.0.1:8025. Loopback-only per R-26.
+  # The tag is pinned, never :latest (R-22).
   mailpit:
-    image: axllent/mailpit:latest
-    environment:
-      - MP_SMTP_AUTH_ACCEPT_ANY=1
-      - MP_SMTP_AUTH_ALLOW_INSECURE=1
+    image: axllent/mailpit:v1.27.8
     ports:
       - "127.0.0.1:8025:8025"
     restart: unless-stopped

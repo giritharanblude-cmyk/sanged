@@ -83,7 +83,7 @@ sanged/
    ├─ coolify/                # Docker Compose, env template
    ├─ local/                  # Host setup notes
    ├─ runbooks/               # Deploy, restore, WhatsApp pairing
-   └─ scripts/                # deploy.sh, backup.sh
+   └─ scripts/                # deploy.sh, offdisk-backup.sh
 ```
 
 ## Validation

@@ -31,7 +31,9 @@ frontend/src/**/*.js
 *.swp
 *.swo
 *~
-*�
+
+# Local verification scratch files (curl cookie jars etc.)
+.curl-jar-*.txt
 
 # OS
 .DS_Store

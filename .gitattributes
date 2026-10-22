@@ -1,0 +1,13 @@
+# Normalise line endings so the same bytes hash identically on Windows
+# (core.autocrlf=true) and Linux (CI). Without this, generated files such as
+# frontend/src/generated/api.ts are written with LF by the generator while the
+# checkout expects CRLF, and git reports a phantom modification after every
+# build even though the content is byte-identical to the index.
+* text=auto eol=lf
+
+# Shell scripts must stay LF or the container entrypoints break.
+*.sh text eol=lf
+
+# Windows-only scripts keep CRLF.
+*.bat text eol=crlf
+*.ps1 text eol=crlf

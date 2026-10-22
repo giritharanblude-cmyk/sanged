@@ -138,7 +138,7 @@ class PayslipService:
             ).all()
         )
         return [
-            {"kind": line.kind, "label": line.label, "amount": float(line.amount)}
+            {"kind": line.kind, "label": line.label, "amount": line.amount}
             for line in lines
         ]
 
@@ -149,11 +149,11 @@ class PayslipService:
             "month": payslip.month,
             "revision": payslip.revision,
             "status": payslip.status,
-            "gross": float(payslip.gross) if payslip.gross else 0.0,
-            "total_deductions": float(payslip.total_deductions)
-            if payslip.total_deductions
-            else 0.0,
-            "net": float(payslip.net) if payslip.net else 0.0,
+            "gross": payslip.gross if payslip.gross is not None else Decimal("0"),
+            "total_deductions": payslip.total_deductions
+            if payslip.total_deductions is not None
+            else Decimal("0"),
+            "net": payslip.net if payslip.net is not None else Decimal("0"),
             "net_in_words": payslip.net_in_words or "",
             "issued_on": payslip.issued_on.isoformat() if payslip.issued_on else None,
             "lines": self._line_dicts(payslip.id),

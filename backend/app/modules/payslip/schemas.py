@@ -4,6 +4,8 @@ from decimal import Decimal
 
 from pydantic import BaseModel, Field
 
+from app.core.money import Money
+
 
 class DeductionLineIn(BaseModel):
     label: str = Field(min_length=1, max_length=200)
@@ -29,7 +31,7 @@ class PayslipCreate(BaseModel):
 class PayslipLineOut(BaseModel):
     kind: str
     label: str
-    amount: float
+    amount: Money
 
 
 class PayslipOut(BaseModel):
@@ -38,9 +40,9 @@ class PayslipOut(BaseModel):
     month: str
     revision: int
     status: str
-    gross: float
-    total_deductions: float
-    net: float
+    gross: Money
+    total_deductions: Money
+    net: Money
     net_in_words: str
     issued_on: date | None
     lines: list[PayslipLineOut] = []

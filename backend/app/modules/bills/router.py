@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session as DbSession
 
 from app.core.db import get_db
 from app.core.errors import AppError
+from app.core.money import Money
 from app.core.security import require_user
 from app.kernel import models
 
@@ -16,20 +17,27 @@ router = APIRouter(prefix="/api/v1/bills", tags=["bills"])
 
 class BillItemOut(BaseModel):
     description: str | None
-    amount: float
+    amount: Money | None = None
 
 
-class BillOut(BaseModel):
+class BillSummaryOut(BaseModel):
+    """List projection: no item lines, to keep the list payload small."""
+
     id: str
     serial: str | None
     vendor: str | None
-    total: float
+    total: Money | None = None
     review_state: str
     source: str
+
+
+class BillOut(BillSummaryOut):
+    """One bill with its item lines."""
+
     items: list[BillItemOut] = []
 
 
-@router.get("/bills")
+@router.get("", response_model=list[BillSummaryOut])
 def list_bills(
     db: Annotated[DbSession, Depends(get_db)],
     _user: Annotated[models.User, Depends(require_user)],
@@ -47,7 +55,7 @@ def list_bills(
             "id": b.id,
             "serial": b.serial,
             "vendor": b.vendor,
-            "total": float(b.total) if b.total else 0.0,
+            "total": b.total,
             "review_state": b.review_state,
             "source": b.source,
         }
@@ -55,7 +63,7 @@ def list_bills(
     ]
 
 
-@router.get("/bills/{bill_id}")
+@router.get("/{bill_id}", response_model=BillOut)
 def get_bill(
     bill_id: str,
     db: Annotated[DbSession, Depends(get_db)],
@@ -72,10 +80,8 @@ def get_bill(
         "id": bill.id,
         "serial": bill.serial,
         "vendor": bill.vendor,
-        "total": float(bill.total) if bill.total else 0.0,
+        "total": bill.total,
         "review_state": bill.review_state,
-        "items": [
-            {"description": i.description, "amount": float(i.amount) if i.amount else 0.0}
-            for i in items
-        ],
+        "source": bill.source,
+        "items": [{"description": i.description, "amount": i.amount} for i in items],
     }

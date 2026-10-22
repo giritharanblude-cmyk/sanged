@@ -1,4 +1,5 @@
 """HTTP middleware: security headers, CSRF, Redis-backed rate limiting."""
+import logging
 import time
 
 from fastapi import FastAPI, Request, Response
@@ -6,8 +7,17 @@ from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 
 from app.core.config import settings
+from app.core.logging import (
+    REQUEST_ID_HEADER,
+    new_request_id,
+    reset_request_id,
+    sanitize_request_id,
+    set_request_id,
+)
 from app.core.security import CSRF_SAFE_METHODS, CsrfError, assert_csrf
 from app.kernel.jobs import get_redis, redis_incr
+
+logger = logging.getLogger("sangad.access")
 
 PUBLIC_PATHS: tuple[str, ...] = (
     "/healthz",
@@ -21,6 +31,55 @@ CSRF_EXEMPT_PATHS: frozenset[str] = frozenset(
 # Handlers must never exceed their window counting cost; keys expire anyway.
 RATE_KEY: str = "sangad:ratelimit:{bucket}:{window}"
 SEGMENT_SECTION: int = 2
+
+
+class RequestIdMiddleware(BaseHTTPMiddleware):
+    """Give every request an id, echo it back, and log it (observability).
+
+    The id is bound to the context so every log line emitted while the
+    request is handled carries it, which is what makes an access log
+    traceable. A client may supply its own id, but only if it is safe to
+    echo into a log line.
+
+    The access log records the method, the path without its query string,
+    the status and the duration. It never records a body or a query
+    value, so no personal data reaches the log (R-08).
+    """
+
+    async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
+        supplied = request.headers.get(REQUEST_ID_HEADER, "")
+        request_id = sanitize_request_id(supplied) if supplied else new_request_id()
+        token = set_request_id(request_id)
+        started = time.perf_counter()
+        try:
+            response = await call_next(request)
+        except Exception:
+            logger.exception(
+                "request failed",
+                extra={
+                    "request_id": request_id,
+                    "method": request.method,
+                    "path": request.url.path,
+                },
+            )
+            raise
+        finally:
+            elapsed_ms = round((time.perf_counter() - started) * 1000, 3)
+            reset_request_id(token)
+
+        logger.info(
+            "request completed",
+            extra={
+                "request_id": request_id,
+                "method": request.method,
+                "path": request.url.path,
+                "status_code": response.status_code,
+                "duration_ms": elapsed_ms,
+            },
+        )
+        response.headers[REQUEST_ID_HEADER] = request_id
+        return response
+
 
 
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):

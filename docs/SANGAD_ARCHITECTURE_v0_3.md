@@ -929,6 +929,23 @@ Blocking before Phase 1 unless marked otherwise. Q-15 to Q-24 are new in v0.2. I
 | Q-27 | Confirm the local S3 product and pinned tag cover what the app needs (presigned URLs, versioning, lifecycle for retention). | ADR-19, T-010 | SeaweedFS; Garage if it fits better |
 | Q-28 | Must bill extraction also run fully on the machine (local OCR only, or a local vision model that needs more RAM/GPU)? | ADR-06, A-04, V-BILL-01 | Cloud LLM adapter with local OCR fallback |
 
+### 9.1 Answers (Phase 0A, decided by the owner)
+
+These five questions blocked Phase 0 and were answered by the owner. The
+"Proposed default" column above records the assumption that was in force
+until then; this table records the decision that is now binding.
+
+| # | Decision | Rationale / consequence |
+|---|---|---|
+| Q-15 | **OpenWA with a dedicated number.** The unofficial-gateway ban risk (C-10) is accepted. `InboundChannelPort` / `MessagingPort` keep the official WhatsApp Business Cloud API reachable as a swap, per ADR-12. | T-209 is unblocked. Manual and camera upload remain the fallback if the gateway is down. |
+| Q-16 | **Ubuntu 24.04 LTS** (native bare metal or a Linux VM), **16 GB RAM**, SSD plus a **second disk for backups**. | Matches Coolify's supported baseline, so RK-15 does not apply. V-LOC-01 requires the stack to be healthy within 5 minutes of a reboot. |
+| Q-20 | **SeaweedFS** as the local S3-compatible store. The off-disk copy lands on an **external USB or a second internal disk**. **No encrypted off-site copy** for now. | Keeps the deployment fully local (Q-26, R-26). The off-disk copy is mandatory; a third copy is out of scope. |
+| Q-24 | **Deferred to the start of T-209.** The OpenWA webhook signature header, payload fields and media-fetch endpoint are confirmed against the API reference when T-209 begins, not before. | Not a Phase 0A blocker. R-19 (HMAC verification, timestamp window, dedupe by provider message id) applies once the contract is confirmed. |
+| Q-27 | **SeaweedFS confirmed.** Presigned URLs, versioning and lifecycle for retention are supported, at a pinned image tag. | Closes T-010. Pinned per R-22; the tag is recorded in the production Compose file. |
+
+Still open: Q-01..Q-14, Q-17..Q-19, Q-21..Q-23, Q-25, Q-26, Q-28. None of them
+blocks Phase 0A.
+
 ---
 
 ## 10. Traceability matrix

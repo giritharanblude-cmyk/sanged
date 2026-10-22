@@ -57,6 +57,8 @@ class Settings(BaseSettings):
     otp_max_attempts: int = 5
     session_idle_minutes: int = 30
     session_absolute_hours: int = 12
+    login_failure_limit: int = 5
+    login_lockout_minutes: int = 15
     # Bootstrap admin, used only by `python -m app.seed`.
     admin_username: str = "admin"
     admin_email: str = "admin@sangad.localhost"

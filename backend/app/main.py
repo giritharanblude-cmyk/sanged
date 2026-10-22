@@ -15,10 +15,11 @@ from sqlalchemy import text
 from app.core.config import settings
 from app.core.db import SessionLocal, engine
 from app.core.errors import AppError, app_error_handler
-from app.core.logging import setup_logging
+from app.core.logging import setup_logging, setup_uvicorn_logging
 from app.core.middleware import (
     CsrfMiddleware,
     RateLimitMiddleware,
+    RequestIdMiddleware,
     SecurityHeadersMiddleware,
 )
 from app.core.security import CsrfError, require_user
@@ -31,6 +32,12 @@ from app.modules.employees.router import router as employees_router
 from app.modules.inventory.router import router as inventory_router
 from app.modules.payslip.router import router as payslip_router
 from app.routers import auth
+
+# uvicorn writes its start-up lines before the application lifespan runs, so
+# its loggers are pointed at the JSON formatter as soon as this module is
+# imported. Only uvicorn's own loggers are touched here; the root logger is
+# left to setup_logging() in the lifespan.
+setup_uvicorn_logging()
 
 # Built SPA assets, copied in by backend/Dockerfile (ADR-17: one origin).
 STATIC_DIR = Path(__file__).resolve().parent.parent / "static"
@@ -86,6 +93,8 @@ _MW_FACTORY = cast(
 app.add_middleware(_MW_FACTORY, max_requests=600, window_seconds=60)
 app.add_middleware(CsrfMiddleware)
 app.add_middleware(SecurityHeadersMiddleware)
+# Outermost, so the request id is set before anything else logs.
+app.add_middleware(RequestIdMiddleware)
 _exc_handler = cast(
     Callable[[Request, Exception], Response | Awaitable[Response]],
     csrf_error_handler,

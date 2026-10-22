@@ -9,11 +9,11 @@ Derived from architecture v0.3. This is the actionable execution plan.
 **Goal: A working localhost deployment serving a logged-in landing page.**
 
 ### Step 0.0 — Resolve blocking questions
-- [ ] Q-15: Accept OpenWA ban risk or switch to official API?
-- [ ] Q-16: Choose host (Ubuntu 24.04 LTS recommended) and confirm hardware (16 GB RAM, SSD, second disk)
-- [ ] Q-20: Confirm SeaweedFS as local S3 and which physical disk holds backups
-- [ ] Q-24: Review current OpenWA webhook API reference before building adapter
-- [ ] Q-27: Verify SeaweedFS supports presigned URLs + versioning
+- [x] Q-15: Accept OpenWA ban risk or switch to official API? → **OpenWA with a dedicated number** (see architecture §9.1)
+- [x] Q-16: Choose host (Ubuntu 24.04 LTS recommended) and confirm hardware (16 GB RAM, SSD, second disk) → **Ubuntu 24.04 LTS, 16 GB RAM, second disk for backups**
+- [x] Q-20: Confirm SeaweedFS as local S3 and which physical disk holds backups → **SeaweedFS; external USB or second internal disk; no off-site copy**
+- [x] Q-24: Review current OpenWA webhook API reference before building adapter → **deferred to the start of T-209**
+- [x] Q-27: Verify SeaweedFS supports presigned URLs + versioning → **SeaweedFS confirmed, pinned tag**
 
 ### Step 0.1 — Host + Coolify (T-002)
 - Install Ubuntu 24.04, Docker Engine 24+, full-disk encryption

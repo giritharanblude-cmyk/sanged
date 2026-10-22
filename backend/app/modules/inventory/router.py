@@ -2,17 +2,32 @@
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, Query
+from pydantic import BaseModel
 from sqlalchemy import Integer, case, cast, func, select
 from sqlalchemy.orm import Session as DbSession
 
 from app.core.db import get_db
+from app.core.money import Money
 from app.core.security import require_user
 from app.kernel import models
 
 router = APIRouter(prefix="/api/v1/inventory", tags=["inventory"])
 
 
-@router.get("/items")
+class InventoryItemOut(BaseModel):
+    """Response model for GET /items."""
+
+    id: str
+    sku: str
+    name: str
+    category: str
+    unit: str
+    quantity: int
+    reorder_level: int | None = None
+    unit_cost: Money | None = None
+
+
+@router.get("/items", response_model=list[InventoryItemOut])
 def list_items(
     db: Annotated[DbSession, Depends(get_db)],
     _user: Annotated[models.User, Depends(require_user)],
@@ -56,7 +71,7 @@ def list_items(
             "unit": item.unit or "",
             "quantity": quantities.get(item.id, 0),
             "reorder_level": item.reorder_level,
-            "unit_cost": float(item.unit_cost) if item.unit_cost else 0.0,
+            "unit_cost": item.unit_cost,
         }
         for item in items
     ]

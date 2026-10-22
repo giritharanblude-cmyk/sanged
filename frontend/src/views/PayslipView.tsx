@@ -110,13 +110,13 @@ export function PayslipView({ username, role, onLogout }: Props) {
                       </span>
                     </td>
                     <td className="px-4 py-3 text-right tabular-nums">
-                      {p.gross.toFixed(2)}
+                      {p.gross}
                     </td>
                     <td className="px-4 py-3 text-right tabular-nums text-red-600">
-                      {p.total_deductions.toFixed(2)}
+                      {p.total_deductions}
                     </td>
                     <td className="px-4 py-3 text-right font-medium tabular-nums">
-                      {p.net.toFixed(2)}
+                      {p.net}
                     </td>
                   </tr>
                 ))}

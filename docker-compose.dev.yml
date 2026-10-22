@@ -74,6 +74,12 @@ services:
       APP_DB_USER: ${APP_DB_USER:-sangad_app}
       TEST_REDIS_URL: redis://redis:6379/1
       REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+      # The decision-guard test reads the architecture and build plan, which
+      # are not part of the image. The docs are mounted read-only below.
+      SANGAD_DOCS_ROOT: /docs
+      # The compose-policy test reads the compose files, which are not part
+      # of the image either. Only the files it needs are mounted.
+      SANGAD_REPO_ROOT: /repo
       SECRET_KEY: ${SECRET_KEY:?Set SECRET_KEY in .env}
       ALLOWED_HOSTS: ${ALLOWED_HOSTS:-localhost,sangad.localhost,127.0.0.1}
       COOKIE_SECURE: ${COOKIE_SECURE:-false}
@@ -99,9 +105,14 @@ services:
       OTP_MAX_ATTEMPTS: ${OTP_MAX_ATTEMPTS:-5}
       SESSION_IDLE_MINUTES: ${SESSION_IDLE_MINUTES:-30}
       SESSION_ABSOLUTE_HOURS: ${SESSION_ABSOLUTE_HOURS:-12}
+      LOGIN_FAILURE_LIMIT: ${LOGIN_FAILURE_LIMIT:-5}
+      LOGIN_LOCKOUT_MINUTES: ${LOGIN_LOCKOUT_MINUTES:-15}
     volumes:
       - app_storage:/var/lib/sangad/storage
       - ./backend/tests:/app/tests:ro
+      - ./docs:/docs:ro
+      - ./infra:/repo/infra:ro
+      - ./docker-compose.dev.yml:/repo/docker-compose.dev.yml:ro
     ports:
       - "127.0.0.1:8088:8000"
     depends_on:

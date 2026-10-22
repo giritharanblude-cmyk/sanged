@@ -17,21 +17,24 @@ from typing import Any, Final
 from fastapi import Request
 from sqlalchemy.orm import Session as DbSession
 
+from app.core.config import settings
 from app.core.errors import AppError
 from app.core.passwords import hash_password, verify_password
 from app.kernel import models
 from app.kernel.jobs import get_redis, redis_exists, redis_incr, redis_ttl
 from app.kernel.mail import send_email
 
-# --- tunables (unit tests pin these) -----------------------------------------
+# --- tunables -----------------------------------------------------------------
+# The policy values an operator can change live in Settings (R-17): OTP
+# expiry and attempts, session idle and absolute lifetime, and the login
+# lockout threshold and window. They are read through `settings` at the
+# point of use so a configuration change takes effect without a code edit.
+#
+# The constants below are fixed protocol rules that no deployment should
+# change: the OTP digit count, the resend cooldown, and the password
+# minimum length.
 OTP_LENGTH: Final[int] = 6
-OTP_MAX_ATTEMPTS: Final[int] = 5
-OTP_EXP_MINUTES: Final[int] = 5
 OTP_RESEND_COOLDOWN_SECONDS: Final[int] = 60  # F-AUTH-02
-LOGIN_FAILURE_LIMIT: Final[int] = 5  # F-AUTH-05 "N"
-LOGIN_LOCKOUT_MINUTES: Final[int] = 15  # F-AUTH-05 lock window
-SESSION_IDLE_MINUTES: Final[int] = 30  # F-AUTH-05 idle timeout
-SESSION_ABSOLUTE_HOURS: Final[int] = 12  # absolute cap
 PASSWORD_MIN_LENGTH: Final[int] = 8
 
 # Redis key namespaces. Every value carries its own TTL.
@@ -83,9 +86,9 @@ def record_login_failure(username: str) -> int:
     key = _FAIL_KEY.format(username=username.lower())
     count = redis_incr(key)
     if count == 1:
-        get_redis().expire(key, LOGIN_LOCKOUT_MINUTES * 60)
-    if count >= LOGIN_FAILURE_LIMIT:
-        get_redis().set(_lock_key(username), "1", ex=LOGIN_LOCKOUT_MINUTES * 60)
+        get_redis().expire(key, settings.login_lockout_minutes * 60)
+    if count >= settings.login_failure_limit:
+        get_redis().set(_lock_key(username), "1", ex=settings.login_lockout_minutes * 60)
         get_redis().delete(key)
     return count
 
@@ -134,7 +137,7 @@ def issue_otp(db: DbSession, user: models.User, purpose: str) -> None:
         user_id=user.id,
         purpose=purpose,
         code_hash=_hash_otp(otp),
-        expires_at=_now() + timedelta(minutes=OTP_EXP_MINUTES),
+        expires_at=_now() + timedelta(minutes=settings.otp_expiry_minutes),
     )
     db.add(challenge)
     db.commit()
@@ -143,7 +146,7 @@ def issue_otp(db: DbSession, user: models.User, purpose: str) -> None:
     sent = send_email(
         str(user.email),
         "Your SANGAD verification code",
-        f"Your verification code is: {otp}\nExpires in {OTP_EXP_MINUTES} minutes.",
+        f"Your verification code is: {otp}\nExpires in {settings.otp_expiry_minutes} minutes.",
     )
     if not sent:
         challenge.consumed_at = _now()
@@ -173,8 +176,8 @@ def initiate_login(db: DbSession, username: str, password: str, _ip: str) -> dic
             raise AppError(
                 423,
                 "account_locked",
-                f"Account locked for {LOGIN_LOCKOUT_MINUTES} minutes after "
-                f"{LOGIN_FAILURE_LIMIT} failed attempts.",
+                f"Account locked for {settings.login_lockout_minutes} minutes after "
+                f"{settings.login_failure_limit} failed attempts.",
             )
         raise AppError(401, "invalid_credentials", "Invalid username or password")
 
@@ -193,7 +196,7 @@ def verify_otp(db: DbSession, username: str, otp: str, ip: str) -> dict[str, Any
     if not challenge:
         raise AppError(401, "otp_expired", "Code expired or not requested")
 
-    if challenge.attempts >= OTP_MAX_ATTEMPTS:
+    if challenge.attempts >= settings.otp_max_attempts:
         challenge.consumed_at = _now()
         db.commit()
         raise AppError(401, "otp_locked", "Too many incorrect codes; request a new one")
@@ -210,7 +213,7 @@ def verify_otp(db: DbSession, username: str, otp: str, ip: str) -> dict[str, Any
         token_hash=_hash_token(token),
         ip_address=ip,
         last_activity=_now(),
-        expires_at=_now() + timedelta(hours=SESSION_ABSOLUTE_HOURS),
+        expires_at=_now() + timedelta(hours=settings.session_absolute_hours),
     )
     db.add(session)
     db.flush()
@@ -248,7 +251,7 @@ def get_current_session(
     if not row or row.expires_at <= _now():
         raise AppError(401, "session_expired", "Invalid or expired session")
 
-    idle_cutoff = _now() - timedelta(minutes=SESSION_IDLE_MINUTES)
+    idle_cutoff = _now() - timedelta(minutes=settings.session_idle_minutes)
     if row.last_activity < idle_cutoff:
         db.delete(row)
         db.commit()
@@ -299,7 +302,7 @@ def change_password(  # noqa: PLR0913 - coordinates from one request envelope
         raise AppError(
             403, "otp_required", "Verify the emailed code before changing the password"
         )
-    if challenge.attempts >= OTP_MAX_ATTEMPTS:
+    if challenge.attempts >= settings.otp_max_attempts:
         challenge.consumed_at = _now()
         db.commit()
         raise AppError(401, "otp_locked", "Too many incorrect codes; request a new one")

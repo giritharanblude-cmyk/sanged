@@ -236,9 +236,15 @@ def verify_otp(db: DbSession, username: str, otp: str, ip: str) -> dict[str, Any
 def get_current_session(
     db: DbSession, request: Request
 ) -> tuple[models.User, models.Session]:
-    """Resolve the session cookie (Authorization: Bearer for tests/CLI only)."""
+    """Resolve the session cookie.
+
+    The `Authorization: Bearer` form exists for tests and command line
+    tooling. It is only honoured in a local environment: in a deployment
+    the session must come from the httpOnly cookie, so that a token can
+    never be smuggled in from another client.
+    """
     token = request.cookies.get("session")
-    if not token:
+    if not token and settings.is_local:
         auth = request.headers.get("authorization", "")
         if auth.lower().startswith("bearer "):
             token = auth[7:].strip()

@@ -8,13 +8,13 @@ from app.core.db import get_db
 from app.core.errors import AppError
 from app.core.security import require_user
 from app.kernel import models
-from app.modules.payslip.schemas import PayslipCreate
+from app.modules.payslip.schemas import PayslipCreate, PayslipOut
 from app.modules.payslip.service import PayslipService
 
 router = APIRouter(prefix="/api/v1/payslip", tags=["payslip"])
 
 
-@router.post("/payslips")
+@router.post("/payslips", response_model=PayslipOut)
 def create_payslip(
     data: PayslipCreate,
     db: Annotated[DbSession, Depends(get_db)],
@@ -24,7 +24,7 @@ def create_payslip(
     return PayslipService(db).create_payslip(data)
 
 
-@router.get("/payslips")
+@router.get("/payslips", response_model=list[PayslipOut])
 def list_payslips(
     db: Annotated[DbSession, Depends(get_db)],
     _user: Annotated[models.User, Depends(require_user)],
@@ -37,7 +37,7 @@ def list_payslips(
     return PayslipService(db).list_payslips(month, status, skip, limit)
 
 
-@router.get("/payslips/{payslip_id}")
+@router.get("/payslips/{payslip_id}", response_model=PayslipOut)
 def get_payslip(
     payslip_id: str,
     db: Annotated[DbSession, Depends(get_db)],
@@ -50,7 +50,7 @@ def get_payslip(
     return result
 
 
-@router.post("/payslips/{payslip_id}/generate")
+@router.post("/payslips/{payslip_id}/generate", response_model=PayslipOut)
 def generate_payslip(
     payslip_id: str,
     db: Annotated[DbSession, Depends(get_db)],
@@ -63,7 +63,7 @@ def generate_payslip(
     return result
 
 
-@router.post("/payslips/{payslip_id}/send")
+@router.post("/payslips/{payslip_id}/send", response_model=PayslipOut)
 def send_payslip(
     payslip_id: str,
     db: Annotated[DbSession, Depends(get_db)],

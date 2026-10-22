@@ -15,11 +15,14 @@ describe('payslip screens', () => {
       id: 'payslip-1',
       employee_code: 'EMP-42',
       month: '2026-01',
+      revision: 1,
       status: 'draft',
-      gross: 5000,
-      total_deductions: 250,
-      net: 4750,
+      gross: '5000.00',
+      total_deductions: '250.00',
+      net: '4750.00',
       net_in_words: 'Four Thousand Seven Hundred Fifty Only',
+      issued_on: null,
+      lines: [],
     })
     const onCreated = vi.fn()
     render(<CreatePayslip onCreated={onCreated} />)
@@ -45,7 +48,7 @@ describe('payslip screens', () => {
       other_allowances: 0,
       total_working_days: 30,
       days_paid: 28,
-      deduction_lines: [{ kind: 'deduction', label: 'PF', amount: 250 }],
+      deduction_lines: [{ label: 'PF', amount: 250 }],
     })
     await waitFor(() => expect(onCreated).toHaveBeenCalled())
   })
@@ -83,11 +86,14 @@ describe('payslip screens', () => {
         id: 'payslip-1',
         employee_code: 'EMP-42',
         month: '2026-01',
+        revision: 1,
         status: 'draft',
-        gross: 5000,
-        total_deductions: 250,
-        net: 4750,
+        gross: '5000.00',
+        total_deductions: '250.00',
+        net: '4750.00',
         net_in_words: 'Four Thousand Seven Hundred Fifty Only',
+        issued_on: null,
+        lines: [],
       },
     ])
     vi.spyOn(api, 'logout').mockResolvedValue({ message: 'Logged out' })

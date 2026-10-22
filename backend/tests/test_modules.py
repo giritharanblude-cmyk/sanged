@@ -21,7 +21,7 @@ def test_create_employee_then_soft_delete(
     authenticated_client: TestClient, db: Session
 ) -> None:
     response = authenticated_client.post(
-        "/api/v1/employees/employees",
+        "/api/v1/employees",
         json={
             "employee_code": "EMP-010",
             "name": "Asha Nair",
@@ -34,15 +34,15 @@ def test_create_employee_then_soft_delete(
     assert response.status_code == HTTPStatus.OK
     employee_id = response.json()["id"]
 
-    listed = authenticated_client.get("/api/v1/employees/employees")
+    listed = authenticated_client.get("/api/v1/employees")
     assert any(row["code"] == "EMP-010" for row in listed.json())
 
     deleted = authenticated_client.delete(
-        f"/api/v1/employees/employees/{employee_id}",
+        f"/api/v1/employees/{employee_id}",
         headers=_csrf_headers(authenticated_client),
     )
     assert deleted.status_code == HTTPStatus.OK
-    after = authenticated_client.get("/api/v1/employees/employees")
+    after = authenticated_client.get("/api/v1/employees")
     assert not any(row["code"] == "EMP-010" for row in after.json())
 
     audit_actions = {
@@ -58,9 +58,9 @@ def test_duplicate_employee_code_returns_conflict(
 ) -> None:
     payload = {"employee_code": "EMP-DUP", "name": "First"}
     headers = _csrf_headers(authenticated_client)
-    authenticated_client.post("/api/v1/employees/employees", json=payload, headers=headers)
+    authenticated_client.post("/api/v1/employees", json=payload, headers=headers)
     duplicate = authenticated_client.post(
-        "/api/v1/employees/employees",
+        "/api/v1/employees",
         json={**payload, "name": "Second"},
         headers=headers,
     )
@@ -93,12 +93,12 @@ def test_bills_list_and_missing_bill_return_not_found(
     db.add(Bill(vendor="Acme", total=Decimal("199.50"), status="draft"))
     db.commit()
 
-    listed = authenticated_client.get("/api/v1/bills/bills")
+    listed = authenticated_client.get("/api/v1/bills")
     assert listed.status_code == HTTPStatus.OK
     assert any(row["vendor"] == "Acme" for row in listed.json())
 
     missing_id = "00000000-0000-0000-0000-000000000000"
-    missing = authenticated_client.get(f"/api/v1/bills/bills/{missing_id}")
+    missing = authenticated_client.get(f"/api/v1/bills/{missing_id}")
     assert missing.status_code == HTTPStatus.NOT_FOUND
 
 

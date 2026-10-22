@@ -268,7 +268,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/bills/bills": {
+    "/api/v1/bills": {
         parameters: {
             query?: never;
             header?: never;
@@ -279,7 +279,7 @@ export interface paths {
          * List Bills
          * @description Paginated bills list, newest first.
          */
-        get: operations["list_bills_api_v1_bills_bills_get"];
+        get: operations["list_bills_api_v1_bills_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -288,7 +288,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/bills/bills/{bill_id}": {
+    "/api/v1/bills/{bill_id}": {
         parameters: {
             query?: never;
             header?: never;
@@ -299,7 +299,7 @@ export interface paths {
          * Get Bill
          * @description One bill with its items, 404 when missing.
          */
-        get: operations["get_bill_api_v1_bills_bills__bill_id__get"];
+        get: operations["get_bill_api_v1_bills__bill_id__get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -328,7 +328,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/employees/employees": {
+    "/api/v1/employees": {
         parameters: {
             query?: never;
             header?: never;
@@ -339,20 +339,20 @@ export interface paths {
          * List Employees
          * @description List endpoint for F-EMP-06. Correct, paginated, soft-delete aware.
          */
-        get: operations["list_employees_api_v1_employees_employees_get"];
+        get: operations["list_employees_api_v1_employees_get"];
         put?: never;
         /**
          * Create Employee
          * @description Manual entry (F-EMP-01). duplicate employee_code -> 409 (F-EMP-05).
          */
-        post: operations["create_employee_api_v1_employees_employees_post"];
+        post: operations["create_employee_api_v1_employees_post"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/v1/employees/employees/{employee_id}": {
+    "/api/v1/employees/{employee_id}": {
         parameters: {
             query?: never;
             header?: never;
@@ -363,14 +363,14 @@ export interface paths {
          * Get Employee
          * @description One employee, 404 when missing (F-EMP-06).
          */
-        get: operations["get_employee_api_v1_employees_employees__employee_id__get"];
+        get: operations["get_employee_api_v1_employees__employee_id__get"];
         put?: never;
         post?: never;
         /**
          * Delete Employee
          * @description Soft delete only, so payslip history survives (F-EMP-05).
          */
-        delete: operations["delete_employee_api_v1_employees_employees__employee_id__delete"];
+        delete: operations["delete_employee_api_v1_employees__employee_id__delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -405,6 +405,54 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** BillItemOut */
+        BillItemOut: {
+            /** Description */
+            description: string | null;
+            /** Amount */
+            amount?: string | null;
+        };
+        /**
+         * BillOut
+         * @description One bill with its item lines.
+         */
+        BillOut: {
+            /** Id */
+            id: string;
+            /** Serial */
+            serial: string | null;
+            /** Vendor */
+            vendor: string | null;
+            /** Total */
+            total?: string | null;
+            /** Review State */
+            review_state: string;
+            /** Source */
+            source: string;
+            /**
+             * Items
+             * @default []
+             */
+            items: components["schemas"]["BillItemOut"][];
+        };
+        /**
+         * BillSummaryOut
+         * @description List projection: no item lines, to keep the list payload small.
+         */
+        BillSummaryOut: {
+            /** Id */
+            id: string;
+            /** Serial */
+            serial: string | null;
+            /** Vendor */
+            vendor: string | null;
+            /** Total */
+            total?: string | null;
+            /** Review State */
+            review_state: string;
+            /** Source */
+            source: string;
+        };
         /** CompanyProfileUpdate */
         CompanyProfileUpdate: {
             /** Legal Name */
@@ -480,7 +528,7 @@ export interface components {
              * Salary
              * @default 0
              */
-            salary: number;
+            salary: number | string;
         };
         /**
          * EmployeeOut
@@ -497,11 +545,35 @@ export interface components {
             designation: string;
             /** Email */
             email: string;
+            /** Salary */
+            salary?: string | null;
         };
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
+        };
+        /**
+         * InventoryItemOut
+         * @description Response model for GET /items.
+         */
+        InventoryItemOut: {
+            /** Id */
+            id: string;
+            /** Sku */
+            sku: string;
+            /** Name */
+            name: string;
+            /** Category */
+            category: string;
+            /** Unit */
+            unit: string;
+            /** Quantity */
+            quantity: number;
+            /** Reorder Level */
+            reorder_level?: number | null;
+            /** Unit Cost */
+            unit_cost?: string | null;
         };
         /** LoginRequest */
         LoginRequest: {
@@ -572,6 +644,43 @@ export interface components {
              * @default
              */
             aadhaar: string;
+        };
+        /** PayslipLineOut */
+        PayslipLineOut: {
+            /** Kind */
+            kind: string;
+            /** Label */
+            label: string;
+            /** Amount */
+            amount: string;
+        };
+        /** PayslipOut */
+        PayslipOut: {
+            /** Id */
+            id: string;
+            /** Employee Code */
+            employee_code: string | null;
+            /** Month */
+            month: string;
+            /** Revision */
+            revision: number;
+            /** Status */
+            status: string;
+            /** Gross */
+            gross: string;
+            /** Total Deductions */
+            total_deductions: string;
+            /** Net */
+            net: string;
+            /** Net In Words */
+            net_in_words: string;
+            /** Issued On */
+            issued_on: string | null;
+            /**
+             * Lines
+             * @default []
+             */
+            lines: components["schemas"]["PayslipLineOut"][];
         };
         /** ValidationError */
         ValidationError: {
@@ -852,9 +961,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    }[];
+                    "application/json": components["schemas"]["PayslipOut"][];
                 };
             };
             /** @description Validation Error */
@@ -887,9 +994,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["PayslipOut"];
                 };
             };
             /** @description Validation Error */
@@ -920,9 +1025,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["PayslipOut"];
                 };
             };
             /** @description Validation Error */
@@ -953,9 +1056,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["PayslipOut"];
                 };
             };
             /** @description Validation Error */
@@ -986,9 +1087,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["PayslipOut"];
                 };
             };
             /** @description Validation Error */
@@ -1002,7 +1101,7 @@ export interface operations {
             };
         };
     };
-    list_bills_api_v1_bills_bills_get: {
+    list_bills_api_v1_bills_get: {
         parameters: {
             query?: {
                 skip?: number;
@@ -1020,9 +1119,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    }[];
+                    "application/json": components["schemas"]["BillSummaryOut"][];
                 };
             };
             /** @description Validation Error */
@@ -1036,7 +1133,7 @@ export interface operations {
             };
         };
     };
-    get_bill_api_v1_bills_bills__bill_id__get: {
+    get_bill_api_v1_bills__bill_id__get: {
         parameters: {
             query?: never;
             header?: never;
@@ -1053,9 +1150,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["BillOut"];
                 };
             };
             /** @description Validation Error */
@@ -1087,9 +1182,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    }[];
+                    "application/json": components["schemas"]["InventoryItemOut"][];
                 };
             };
             /** @description Validation Error */
@@ -1103,7 +1196,7 @@ export interface operations {
             };
         };
     };
-    list_employees_api_v1_employees_employees_get: {
+    list_employees_api_v1_employees_get: {
         parameters: {
             query?: {
                 skip?: number;
@@ -1135,7 +1228,7 @@ export interface operations {
             };
         };
     };
-    create_employee_api_v1_employees_employees_post: {
+    create_employee_api_v1_employees_post: {
         parameters: {
             query?: never;
             header?: never;
@@ -1170,7 +1263,7 @@ export interface operations {
             };
         };
     };
-    get_employee_api_v1_employees_employees__employee_id__get: {
+    get_employee_api_v1_employees__employee_id__get: {
         parameters: {
             query?: never;
             header?: never;
@@ -1187,9 +1280,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["EmployeeOut"];
                 };
             };
             /** @description Validation Error */
@@ -1203,7 +1294,7 @@ export interface operations {
             };
         };
     };
-    delete_employee_api_v1_employees_employees__employee_id__delete: {
+    delete_employee_api_v1_employees__employee_id__delete: {
         parameters: {
             query?: never;
             header?: never;

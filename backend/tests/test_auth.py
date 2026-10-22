@@ -40,8 +40,8 @@ def test_health_open_but_protected_routes_blocked(api_client: TestClient) -> Non
     """V-AUTH-06: protected endpoints reject requests without a session."""
     paths = (
         "/api/v1/payslip/payslips",
-        "/api/v1/employees/employees",
-        "/api/v1/bills/bills",
+        "/api/v1/employees",
+        "/api/v1/bills",
         "/api/v1/inventory/items",
         "/api/v1/auth/me",
     )

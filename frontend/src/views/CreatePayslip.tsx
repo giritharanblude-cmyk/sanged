@@ -36,7 +36,7 @@ export function CreatePayslip({ onCreated }: Props) {
         days_paid: Number(daysPaid),
         deduction_lines:
           Number(deductionAmount) > 0
-            ? [{ kind: 'deduction', label: deductionLabel, amount: Number(deductionAmount) }]
+            ? [{ label: deductionLabel, amount: Number(deductionAmount) }]
             : [],
       })
       await onCreated()

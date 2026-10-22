@@ -1,6 +1,7 @@
-import type { paths as OpenApiPaths } from './generated/api'
+import type { components, paths as OpenApiPaths } from './generated/api'
 
 type ApiPath = keyof OpenApiPaths
+type Schemas = components['schemas']
 
 const apiPaths = {
   login: '/api/v1/auth/login',
@@ -63,27 +64,33 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   return body as T
 }
 
-export interface Payslip {
-  id: string
-  employee_code: string | null
-  month: string
-  status: string
-  gross: number
-  total_deductions: number
-  net: number
-  net_in_words: string
-}
+// The response and request shapes come from the generated OpenAPI client
+// (R-14). Money fields are strings on the wire (R-05), so the frontend
+// never has to reformat a float it received.
+export type Payslip = Schemas['PayslipOut']
 
-export interface PayslipCreate {
-  employee_code: string
-  employee_name?: string
-  month: string
-  basic: number
-  other_allowances: number
-  total_working_days: number
-  days_paid: number
-  deduction_lines: { kind: 'deduction'; label: string; amount: number }[]
-}
+// openapi-typescript emits a field that has a server-side default as a
+// required property, so the generated PayslipCreate demands values the UI
+// has no reason to send. Split it into the fields the caller must provide
+// and the ones the API defaults.
+type PayslipCreateRequired = Pick<
+  Schemas['PayslipCreate'],
+  'employee_code' | 'month' | 'total_working_days' | 'days_paid' | 'basic'
+>
+type PayslipCreateOptional = Partial<
+  Pick<
+    Schemas['PayslipCreate'],
+    | 'employee_name'
+    | 'other_allowances'
+    | 'deduction_lines'
+    | 'payment_mode'
+    | 'designation'
+    | 'date_of_issue'
+    | 'date_of_joining'
+    | 'aadhaar'
+  >
+>
+export type PayslipCreate = PayslipCreateRequired & PayslipCreateOptional
 
 export const api = {
   login: (username: string, password: string) =>

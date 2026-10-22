@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session as DbSession
 
 from app.core.db import get_db
 from app.core.errors import AppError
+from app.core.money import Money
 from app.core.security import require_user
 from app.kernel.audit import AuditContext, write_audit_log
 from app.kernel.models import Employee, User
@@ -28,7 +29,7 @@ class EmployeeCreate(BaseModel):
     designation: str = Field(default="", max_length=200)
     email: str = Field(default="", max_length=255)
     contact_no: str = Field(default="", max_length=20)
-    salary: float = Field(default=0, ge=0)
+    salary: Decimal = Field(default=Decimal("0"), ge=0)
 
 
 class EmployeeOut(BaseModel):
@@ -39,6 +40,7 @@ class EmployeeOut(BaseModel):
     name: str
     designation: str
     email: str
+    salary: Money | None = None
 
 
 def _to_out(emp: Employee) -> EmployeeOut:
@@ -48,10 +50,11 @@ def _to_out(emp: Employee) -> EmployeeOut:
         name=emp.name,
         designation=emp.designation or "",
         email=emp.email or "",
+        salary=emp.salary,
     )
 
 
-@router.get("/employees")
+@router.get("")
 def list_employees(
     db: DbDep,
     _user: UserDep,
@@ -70,7 +73,7 @@ def list_employees(
     return [_to_out(emp) for emp in emps]
 
 
-@router.post("/employees")
+@router.post("", response_model=dict[str, str])
 def create_employee(data: EmployeeCreate, db: DbDep, user: UserDep) -> dict[str, str]:
     """Manual entry (F-EMP-01). duplicate employee_code -> 409 (F-EMP-05)."""
     existing = db.scalar(
@@ -98,23 +101,16 @@ def create_employee(data: EmployeeCreate, db: DbDep, user: UserDep) -> dict[str,
     return {"id": emp.id, "name": emp.name}
 
 
-@router.get("/employees/{employee_id}")
+@router.get("/{employee_id}", response_model=EmployeeOut)
 def get_employee(employee_id: str, db: DbDep, _user: UserDep) -> dict[str, Any]:
     """One employee, 404 when missing (F-EMP-06)."""
     emp = db.get(Employee, employee_id)
     if not emp or emp.deleted_at is not None:
         raise AppError(404, "not_found", "Employee not found")
-    return {
-        "id": emp.id,
-        "code": emp.employee_code,
-        "name": emp.name,
-        "designation": emp.designation or "",
-        "email": emp.email or "",
-        "salary": float(emp.salary) if emp.salary else 0.0,
-    }
+    return _to_out(emp).model_dump()
 
 
-@router.delete("/employees/{employee_id}")
+@router.delete("/{employee_id}", response_model=dict[str, str])
 def delete_employee(employee_id: str, db: DbDep, user: UserDep) -> dict[str, str]:
     """Soft delete only, so payslip history survives (F-EMP-05)."""
     emp = db.get(Employee, employee_id)
